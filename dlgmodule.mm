@@ -33,7 +33,6 @@
 #include <string>
 
 #include "dlgmodule.h"
-#include "widgetbuttons.h"
 #include "config.h"
 
 #include <sys/stat.h>
@@ -42,6 +41,16 @@
 #include <unistd.h>
 
 using std::string;
+
+enum BUTTON_TYPES {
+  BUTTON_ABORT,
+  BUTTON_IGNORE,
+  BUTTON_OK,
+  BUTTON_CANCEL,
+  BUTTON_YES,
+  BUTTON_NO,
+  BUTTON_RETRY
+};
 
 char *owner = NULL;
 
