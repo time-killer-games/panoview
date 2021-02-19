@@ -109,7 +109,7 @@ std::string exeParentDirectory() {
   mib[2] = KERN_PROC_PATHNAME;
   mib[3] = -1;
   if (sysctl(mib, 4, nullptr, &s, nullptr, 0) == 0) {
-    string str; str.resize(s, '\0');
+    std::string str; str.resize(s, '\0');
     char *exe = str.data();
     if (sysctl(mib, 4, exe, &s, nullptr, 0) == 0) {
       fname = exe;
