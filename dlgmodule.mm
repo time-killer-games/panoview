@@ -54,6 +54,8 @@ enum BUTTON_TYPES {
 
 char *owner = NULL;
 
+const char *cocoa_widget_get_button_name(int type);
+
 const char *escquotes(const char *str) {
   NSString *nsstr = [NSString stringWithUTF8String:str];
   return [[nsstr stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""] UTF8String];
