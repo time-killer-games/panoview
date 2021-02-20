@@ -47,13 +47,14 @@
 #include <GL/glut.h>
 #endif
 
+float angleX = 0.0f, xr = 0.0f;
 void CreateCylinder() {
   const double PI = 3.141592653589793;
   double i, resolution  = 0.3141592653589793;
   double height = 3.5;
   double radius = 0.5;
   glPushMatrix();
-  glRotatef(90, 0, 90, 0);
+  glRotatef(90 + xr, 0, 90 + 2, 0);
   glTranslatef(0, -1.75, 0);
   glBegin(GL_TRIANGLE_FAN);
   glTexCoord2f(0.5, 0.5);
@@ -149,13 +150,6 @@ void CreateTexture(const char *fname) {
   delete[] data;
 }
 
-float angle = 0;
-void timer(int value) {
-  angle += 0.1;
-  glutPostRedisplay();
-  glutTimerFunc(16, timer, 0);
-}
-
 void display() {
   glClearColor(0, 0, 0, 1);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -170,20 +164,28 @@ void display() {
   glFrontFace(GL_CW);
   glEnable(GL_DEPTH_TEST);
   glLoadIdentity();
-  glRotatef(angle, 0, 1, 0);
+  glRotatef(angleX, 2, 0, 0);
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   CreateCylinder();
+  glFlush();
   glutSwapBuffers();
+}
+
+void special(int key, int x, int y) {
+  switch (key) {
+    case GLUT_KEY_RIGHT: xr += 2.0f; break;
+    case GLUT_KEY_LEFT:  xr -= 2.0f; break;
+    case GLUT_KEY_UP:    angleX -= (angleX > -28) ? 2.0f : 0; break;
+    case GLUT_KEY_DOWN:  angleX += (angleX <  28) ? 2.0f : 0; break;
+  }
+  glutPostRedisplay();
 }
 
 int window = 0;
 void keyboard(unsigned char key, int x, int y) {
   switch (key) {
-    case 27:
-      glutDestroyWindow(window);
-      exit(0);
-      break;
+    case 27: glutDestroyWindow(window); exit(0); break;
   }
   glutPostRedisplay();
 }
@@ -211,9 +213,9 @@ int main(int argc, char **argv) {
   glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
   CreateTexture(fname);
   glutDisplayFunc(display);
-  glutTimerFunc(0, timer, 0);
   glutSetCursor(GLUT_CURSOR_NONE);
   glutKeyboardFunc(keyboard);
+  glutSpecialFunc(special);
   glutFullScreen();
   glutMainLoop();
   return 0;
