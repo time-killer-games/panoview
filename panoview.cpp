@@ -194,6 +194,7 @@ int main(int argc, char **argv) {
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE);
   window = glutCreateWindow("");
+  glutDisplayFunc(display);
   glutHideWindow();
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   const char *fname;
@@ -213,7 +214,6 @@ int main(int argc, char **argv) {
   glShadeModel(GL_SMOOTH);
   glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
   CreateTexture(fname);
-  glutDisplayFunc(display);
   glutSetCursor(GLUT_CURSOR_CROSSHAIR);
   glutKeyboardFunc(keyboard);
   glutSpecialFunc(special);
