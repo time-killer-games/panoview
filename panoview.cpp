@@ -122,11 +122,12 @@ std::string exeParentDirectory() {
 }
 
 GLuint tex;
+int window = 0;
 void CreateTexture(const char *fname) {
   unsigned char *data = nullptr;
   unsigned pngwidth, pngheight;
   unsigned error = lodepng_decode32_file(&data, &pngwidth, &pngheight, fname);
-  if (error) return;
+  if (error) { glutDestroyWindow(window); exit(1); }
   const int size = pngwidth * pngheight * 4;
   unsigned char *buffer = new unsigned char[size]();
   for (unsigned i = 0; i < pngheight; i++) {
@@ -182,7 +183,6 @@ void special(int key, int x, int y) {
   glutPostRedisplay();
 }
 
-int window = 0;
 void keyboard(unsigned char key, int x, int y) {
   switch (key) {
     case 27: glutDestroyWindow(window); exit(0); break;
@@ -192,6 +192,10 @@ void keyboard(unsigned char key, int x, int y) {
 
 int main(int argc, char **argv) {
   glutInit(&argc, argv);
+  glutInitDisplayMode(GLUT_DOUBLE);
+  window = glutCreateWindow("");
+  glutHideWindow();
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   const char *fname;
   if (argc == 1) {
     dialog_module::widget_set_owner((char *)"-1");
@@ -199,13 +203,10 @@ int main(int argc, char **argv) {
     chdir(dir.c_str()); dialog_module::widget_set_icon((char *)(dir + "/../icon.png").c_str());
     fname = dialog_module::get_open_filename_ext((char *)"Portable Network Graphic (*.png)|*.png;*.PNG",
       (char *)"burning_within.png", (char *)"", (char *)"Choose a 360 Degree Cylindrical Panoramic Image");
-    if (strcmp(fname, "") == 0) { exit(0); }
+    if (strcmp(fname, "") == 0) { glutDestroyWindow(window); exit(0); }
   } else {
     fname = argv[1];
   }
-  glutInitDisplayMode(GLUT_DOUBLE);
-  window = glutCreateWindow("");
-  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClearDepth(1.0f);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LEQUAL);
@@ -216,6 +217,7 @@ int main(int argc, char **argv) {
   glutSetCursor(GLUT_CURSOR_CROSSHAIR);
   glutKeyboardFunc(keyboard);
   glutSpecialFunc(special);
+  glutShowWindow();
   glutFullScreen();
   glutMainLoop();
   return 0;
