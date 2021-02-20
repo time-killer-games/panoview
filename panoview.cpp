@@ -213,7 +213,7 @@ int main(int argc, char **argv) {
   glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
   CreateTexture(fname);
   glutDisplayFunc(display);
-  glutSetCursor(GLUT_CURSOR_NONE);
+  glutSetCursor(GLUT_CURSOR_CROSSHAIR);
   glutKeyboardFunc(keyboard);
   glutSpecialFunc(special);
   glutFullScreen();
