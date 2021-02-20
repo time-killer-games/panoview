@@ -191,6 +191,7 @@ void keyboard(unsigned char key, int x, int y) {
 }
 
 int main(int argc, char **argv) {
+  glutInit(&argc, argv);
   const char *fname;
   if (argc == 1) {
     dialog_module::widget_set_owner((char *)"-1");
@@ -202,7 +203,6 @@ int main(int argc, char **argv) {
   } else {
     fname = argv[1];
   }
-  glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE);
   window = glutCreateWindow("");
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
