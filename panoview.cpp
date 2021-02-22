@@ -321,8 +321,11 @@ int main(int argc, char **argv) {
   glutKeyboardFunc(keyboard);
   glutTimerFunc(0, timer, 0);
 
-  WarpMouse();
-  std::this_thread::sleep_for (std::chrono::milliseconds(5));
+  for (int i = 0; i < 100; i++) {
+    WarpMouse(); xangle = 0; yangle = 0;
+    std::this_thread::sleep_for (std::chrono::milliseconds(5));
+  }
+
   glutShowWindow();
   glutFullScreen();
   glutMainLoop();
