@@ -337,6 +337,8 @@ int main(int argc, char **argv) {
   SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 0, 0, SDL_WINDOW_BORDERLESS);
   if (hidden != nullptr) { SDL_HideWindow(hidden); }
   if (window != 0) glutDestroyWindow(window);
+  glutInitWindowPosition(0, 0);
+  glutInitWindowSize(1, 1);
   window = glutCreateWindow("");
   #if defined(_WIN32)
   EnumWindows(&EnumWindowsProc, SW_HIDE);
