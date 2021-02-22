@@ -310,6 +310,22 @@ void keyboard(unsigned char key, int x, int y) {
   glutPostRedisplay();
 }
 
+#if defined(_WIN32)
+BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam) {
+  DWORD dwProcessId;
+  GetWindowThreadProcessId(hWnd, &dwProcessId);
+  if (dwProcessId == GetCurrentProcessId()) {
+	wchar_t buffer[256];
+    GetWindowTextW(hWnd, buffer, 256);
+	std::string caption = narrow(buffer);
+    if (caption == "") {
+      ShowWindow(hWnd, (DWORD)lParam);
+	}
+  }
+  return true;
+}
+#endif
+
 } // anonymous namespace
 
 int main(int argc, char **argv) {
@@ -318,18 +334,27 @@ int main(int argc, char **argv) {
 
   SDL_Init(SDL_INIT_VIDEO);
   hidden = SDL_CreateWindow("hidden",
-  SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 0, 0, 0);
+  SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 0, 0, SDL_WINDOW_BORDERLESS);
   if (hidden != nullptr) { SDL_HideWindow(hidden); }
   if (window != 0) glutDestroyWindow(window);
   window = glutCreateWindow("");
+  #if defined(_WIN32)
+  EnumWindows(&EnumWindowsProc, SW_HIDE);
+  #endif
+
   glutDisplayFunc(display);
   glutHideWindow();
 
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   std::string parpath = ExecutableParentDirectory();
   std::string panorama; if (argc == 1) {
-  dialog_module::widget_set_owner((char *)"-1");
   std::string dir = parpath + "examples";
+
+  #if defined(_WIN32)
+  dialog_module::widget_set_owner((char *)std::to_string((std::uintptr_t)GetDesktopWindow()).c_str());
+  #else
+  dialog_module::widget_set_owner((char *)"-1");
+  #endif
 
   chdir(dir.c_str()); dialog_module::widget_set_icon((char *)(parpath + "icon.png").c_str());
   panorama = dialog_module::get_open_filename_ext((char *)"Portable Network Graphic (*.png)|*.png;*.PNG",
@@ -354,9 +379,13 @@ int main(int argc, char **argv) {
     WarpMouse(); xangle = 0; yangle = 0;
     std::this_thread::sleep_for (std::chrono::milliseconds(5));
   }
-
+  
   glutShowWindow();
   glutFullScreen();
+  #if defined(_WIN32)
+  EnumWindows(&EnumWindowsProc, SW_SHOW);
+  #endif
+  
   glutMainLoop();
   return 0;
 }
