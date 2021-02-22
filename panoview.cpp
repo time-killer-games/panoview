@@ -11,6 +11,7 @@
  copies of the Software, and to permit persons to whom the Software is
  furnished to do so, subject to the following conditions:
 
+
  The above copyright notice and this permission notice shall be included in all
  copies or substantial portions of the Software.
 
@@ -362,7 +363,7 @@ int main(int argc, char **argv) {
   panorama = dialog_module::get_open_filename_ext((char *)"Portable Network Graphic (*.png)|*.png;*.PNG",
   (char *)"burning_within.png", (char *)"", (char *)"Choose a 360 Degree Cylindrical Panoramic Image");
   if (strcmp(panorama.c_str(), "") == 0) { glutDestroyWindow(window); exit(0); } } else { panorama = argv[1]; }
-  std::string defcursor = (argc > 2) ? argv[2] : parpath + "defcursor.png";
+  std::string cursor = (argc > 2) ? argv[2] : parpath + "cursor.png";
 
   glClearDepth(1.0f);
   glEnable(GL_DEPTH_TEST);
@@ -371,7 +372,7 @@ int main(int argc, char **argv) {
   glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
   LoadPanorama(panorama.c_str());
-  LoadCursor(defcursor.c_str());
+  LoadCursor(cursor.c_str());
 
   glutSetCursor(GLUT_CURSOR_NONE);
   glutKeyboardFunc(keyboard);
