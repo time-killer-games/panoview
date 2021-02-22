@@ -54,6 +54,10 @@
 #include <GL/glut.h>
 #endif
 
+#if defined(_WIN32)
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
+
 namespace {
 
 #if defined(_WIN32)
@@ -74,7 +78,7 @@ std::string ExecutableParentDirectory() {
   std::string fname;
   #if defined(_WIN32)
   wchar_t exe[MAX_PATH];
-  if (GetModuleFileNameW(NULL, buffer, MAX_PATH) != 0) {
+  if (GetModuleFileNameW(NULL, exe, MAX_PATH) != 0) {
     fname = narrow(exe);
   }
   #elif defined(__APPLE__) && defined(__MACH__)
