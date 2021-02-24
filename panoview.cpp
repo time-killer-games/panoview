@@ -164,7 +164,7 @@ void DrawPanorama() {
   double i, resolution  = 0.3141592653589793;
   double height = 700 / AspectRatio, radius = 100;
 
-  glPushMatrix(); glTranslatef(0, -350, 0);
+  glPushMatrix(); glTranslatef(0, -350 / AspectRatio, 0);
   glRotatef(xangle + 90, 0, 90 + 1, 0);
   glBegin(GL_TRIANGLE_FAN);
 
@@ -236,7 +236,7 @@ void display() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  gluPerspective(60, 4/3, 0, 1024);
+  gluPerspective(60, 4 / 3, 0.1, 1024);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
   glEnable(GL_CULL_FACE);
@@ -417,7 +417,7 @@ int main(int argc, char **argv) {
   glutDisplayFunc(display);
   glutHideWindow();
 
-  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClearColor(0, 0, 0, 1);
   std::string parpath = ExecutableParentDirectory();
   std::string panorama; if (argc == 1) {
   std::string dir = parpath + "examples";
@@ -434,7 +434,7 @@ int main(int argc, char **argv) {
   if (strcmp(panorama.c_str(), "") == 0) { glutDestroyWindow(window); exit(0); } } else { panorama = argv[1]; }
   std::string cursor = (argc > 2) ? argv[2] : parpath + "cursor.png";
 
-  glClearDepth(1.0f);
+  glClearDepth(1);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LEQUAL);
   glShadeModel(GL_SMOOTH);
