@@ -451,8 +451,8 @@ int main(int argc, char **argv) {
 
   for (std::size_t i = 0; i < 150; i++) {
     WarpMouse(); 
-	xangle = strtod(std::getenv("PANORAMA_XANGLE"), nullptr) ? : 0; 
-	yangle = strtod(std::getenv("PANORAMA_YANGLE"), nullptr) ? : 0; 
+    xangle = strtod(std::getenv("PANORAMA_XANGLE"), nullptr) ? : 0; 
+    yangle = strtod(std::getenv("PANORAMA_YANGLE"), nullptr) ? : 0; 
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
   
