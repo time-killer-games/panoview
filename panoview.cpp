@@ -42,10 +42,10 @@
 #include "Universal/dlgmodule.h"
 #include "Universal/lodepng.h"
 
-#include <SDL2/SDL.h>
 #include <sys/types.h>
 #include <unistd.h>
 #if defined(__APPLE__) && defined(__MACH__)
+#include <CoreGraphics/CoreGraphics.h>
 #include <GLUT/glut.h>
 #include <libproc.h>
 #else
@@ -53,6 +53,7 @@
 #include <sys/sysctl.h>
 #endif
 #include <GL/glut.h>
+#include <SDL2/SDL.h>
 #endif
 
 #if defined(_WIN32)
@@ -221,7 +222,10 @@ void DrawCursor(GLuint texid, int curx, int cury, int curwidth, int curheight) {
   glEnd(); glDisable(GL_TEXTURE_2D);
 }
 
+#if !defined(__APPLE__) && !defined(__MACH__)
 SDL_Window *hidden = nullptr;
+#endif
+
 void display() {
   glClearColor(0, 0, 0, 1);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -241,9 +245,10 @@ void display() {
   glBindTexture(GL_TEXTURE_2D, tex);
   DrawPanorama(); glFlush();
 
+  #if !defined(__APPLE__) && !defined(__MACH__)
   SDL_Rect rect; if (hidden == nullptr) { return; }
   int dpy = SDL_GetWindowDisplayIndex(hidden);
-  int err = SDL_GetDisplayBounds(dpy, &rect);
+  int err = SDL_GetDisplayBounds(dpy, &rect); 
   if (err == 0) {
     glClear(GL_DEPTH_BITS);
     glMatrixMode(GL_PROJECTION);
@@ -260,6 +265,24 @@ void display() {
     DrawCursor(cur, (rect.w / 2) - 16, (rect.h / 2) - 16, 32, 32);
     glBlendFunc(GL_ONE, GL_ZERO);
   }
+  #else
+  glClear(GL_DEPTH_BITS);
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  int w = CGDisplayPixelsWide(kCGDirectMainDisplay);
+  int h = CGDisplayPixelsHigh(kCGDirectMainDisplay);
+  glOrtho(0, w, h, 0, -1, 1);
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  glDisable(GL_CULL_FACE);
+  glDisable(GL_DEPTH_TEST);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glEnable(GL_TEXTURE_2D);
+  glBindTexture(GL_TEXTURE_2D, cur);
+  DrawCursor(cur, (w / 2) - 16, (h / 2) - 16, 32, 32);
+  glBlendFunc(GL_ONE, GL_ZERO);
+  #endif
 
   glutSwapBuffers();
 }
@@ -283,6 +306,7 @@ void PanoramaSetVertAngle(double vangle) {
 }
 
 void WarpMouse() {
+  #if !defined(__APPLE__) && !defined(__MACH__)
   int mx, my; SDL_Rect rect;
   SDL_GetGlobalMouseState(&mx, &my);
   if (hidden == nullptr) { return; }
@@ -295,10 +319,22 @@ void WarpMouse() {
     PanoramaSetHorzAngle((hdw - mx) / 20);
     PanoramaSetVertAngle((hdh - my) / 20);
   }
+  #else
+  CGEventRef event = CGEventCreate(NULL);
+  CGPoint cursor = CGEventGetLocation(event);
+  CFRelease(event);
+  int hdw = CGDisplayPixelsWide(kCGDirectMainDisplay) / 2;
+  int hdh = CGDisplayPixelsHigh(kCGDirectMainDisplay) / 2;
+  CGDisplayMoveCursorToPoint(kCGDirectMainDisplay, CGPointMake(hdw, hdh));
+  CGSetLocalEventsSuppressionInterval(0.0);
+  PanoramaSetHorzAngle((hdw - cursor.x) / 20);
+  PanoramaSetVertAngle((hdh - cursor.y) / 20);
+  #endif
 }
 
 void timer(int i) {
   WarpMouse();
+  std::this_thread::sleep_for (std::chrono::milliseconds(5));
   glutPostRedisplay();
   glutTimerFunc(5, timer, 0);
 }
@@ -316,12 +352,12 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam) {
   DWORD dwProcessId;
   GetWindowThreadProcessId(hWnd, &dwProcessId);
   if (dwProcessId == GetCurrentProcessId()) {
-	wchar_t buffer[256];
+    wchar_t buffer[256];
     GetWindowTextW(hWnd, buffer, 256);
-	std::string caption = narrow(buffer);
+    std::string caption = narrow(buffer);
     if (caption == "") {
       ShowWindow(hWnd, (DWORD)lParam);
-	}
+    }
   }
   return true;
 }
@@ -333,10 +369,13 @@ int main(int argc, char **argv) {
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE);
 
+  #if !defined(__APPLE__) && !defined(__MACH__)
   SDL_Init(SDL_INIT_VIDEO);
   hidden = SDL_CreateWindow("hidden",
   SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 0, 0, SDL_WINDOW_BORDERLESS);
   if (hidden != nullptr) { SDL_HideWindow(hidden); }
+  #endif
+
   if (window != 0) glutDestroyWindow(window);
   glutInitWindowPosition(0, 0);
   glutInitWindowSize(1, 1);
@@ -387,6 +426,8 @@ int main(int argc, char **argv) {
   glutFullScreen();
   #if defined(_WIN32)
   EnumWindows(&EnumWindowsProc, SW_SHOW);
+  #elif defined(__APPLE__) && defined(__MACH__)
+  CGDisplayHideCursor(kCGDirectMainDisplay);
   #endif
   
   glutMainLoop();
