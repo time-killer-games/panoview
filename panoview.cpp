@@ -448,7 +448,7 @@ int main(int argc, char **argv) {
   glutMouseFunc(mouse);
   glutTimerFunc(0, timer, 0);
 
-  for (std::size_t i = 0; i < 250; i++) {
+  for (std::size_t i = 0; i < 150; i++) {
     WarpMouse(); xangle = 0; yangle = 0;
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
