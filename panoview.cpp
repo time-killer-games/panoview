@@ -35,6 +35,7 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <iostream>
 #if defined(_WIN32)
 #include <vector>
 #endif
@@ -61,6 +62,8 @@
 #endif
 
 namespace {
+
+const double PI = 3.141592653589793;
 
 #if defined(_WIN32)
 std::wstring widen(std::string str) {
@@ -136,10 +139,13 @@ void LoadImage(unsigned char **out, unsigned *pngwidth, unsigned *pngheight, con
 }
 
 GLuint tex;
+double TexWidth, TexHeight, AspectRatio;
 void LoadPanorama(const char *fname) {
   unsigned char *data = nullptr;
   unsigned pngwidth, pngheight;
   LoadImage(&data, &pngwidth, &pngheight, fname);
+  TexWidth  = pngwidth; TexHeight = pngheight;
+  AspectRatio = TexWidth / TexHeight;
 
   glGenTextures(1, &tex);
   glBindTexture(GL_TEXTURE_2D, tex);
@@ -153,15 +159,14 @@ void LoadPanorama(const char *fname) {
   delete[] data;
 }
 
-float xangle = 0.0f;
-float yangle = 0.0f;
+double xangle, yangle;
 void DrawPanorama() {
-  const double PI = 3.141592653589793;
   double i, resolution  = 0.3141592653589793;
-  double height = 3.5, radius = 0.5;
+  double height = 700 / AspectRatio, radius = 100;
 
-  glPushMatrix(); glRotatef(90 + xangle, 0, 90 + 0.5, 0);
-  glTranslatef(0, -1.75, 0); glBegin(GL_TRIANGLE_FAN);
+  glPushMatrix(); glTranslatef(0, -350, 0);
+  glRotatef(xangle + 90, 0, 90 + 1, 0);
+  glBegin(GL_TRIANGLE_FAN);
 
   glTexCoord2f(0.5, 1); glVertex3f(0, height, 0);
   for (i = 2 * PI; i >= 0; i -= resolution) {
@@ -231,10 +236,9 @@ void display() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  gluPerspective(90.0f, 16 / 9, 0.1f, 100.0);
+  gluPerspective(60, 4/3, 0, 1024);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
-  glTranslatef(0, 0, 0);
   glEnable(GL_CULL_FACE);
   glCullFace(GL_BACK);
   glFrontFace(GL_CW);
@@ -293,16 +297,18 @@ double PanoramaSetVertAngle() {
 
 void PanoramaSetHorzAngle(double hangle) {
   xangle -= hangle;
+  if      (xangle > 360) xangle = 0;
+  else if (xangle < 0) xangle = 360;
 }
 
 double PanoramaGetVertAngle() {
   return yangle;
 }
 
+double MaximumVerticalAngle;
 void PanoramaSetVertAngle(double vangle) {
   yangle -= vangle;
-  yangle  = ((yangle >= -28) ? yangle : -28);
-  yangle  = ((yangle <=  28) ? yangle :  28);
+  yangle  = std::fmin(std::fmax(yangle, -MaximumVerticalAngle), MaximumVerticalAngle);
 }
 
 void WarpMouse() {
@@ -332,9 +338,16 @@ void WarpMouse() {
   #endif
 }
 
+void GetTexelUnderCursor(int *TexX, int *TexY) {
+  *TexX = abs(round(2 - std::fmod((xangle / 360 + 1) * TexWidth, TexWidth)));
+  *TexY = TexHeight - (round(((1 - ((std::tan(yangle * PI / 180.0) * 100) / (700 / AspectRatio))) * TexHeight)) - (TexHeight / 2));
+}
+
 void timer(int i) {
+  AspectRatio = std::fmin(std::fmax(AspectRatio, 0.1), 6);
+  MaximumVerticalAngle = (std::atan2((700 / AspectRatio) / 2, 100) * 180.0 / PI) - 30;
   WarpMouse();
-  std::this_thread::sleep_for (std::chrono::milliseconds(5));
+  std::this_thread::sleep_for(std::chrono::milliseconds(5));
   glutPostRedisplay();
   glutTimerFunc(5, timer, 0);
 }
@@ -342,7 +355,24 @@ void timer(int i) {
 int window = 0;
 void keyboard(unsigned char key, int x, int y) {
   switch (key) {
-    case 27: glutDestroyWindow(window); exit(0); break;
+    case 27:
+      glutDestroyWindow(window);
+      std::cout << "Forced Quit..." << std::endl;
+      exit(0);
+      break;
+  }
+  glutPostRedisplay();
+}
+
+void mouse(int button, int state, int x, int y) {
+  switch (button) {
+    case GLUT_LEFT_BUTTON:
+      if (state == GLUT_DOWN) {
+        int TexX, TexY;
+        GetTexelUnderCursor(&TexX, &TexY);
+        std::cout << "Texel Clicked: " << TexX << "," << TexY << std::endl;
+        break;
+      }
   }
   glutPostRedisplay();
 }
@@ -415,11 +445,12 @@ int main(int argc, char **argv) {
 
   glutSetCursor(GLUT_CURSOR_NONE);
   glutKeyboardFunc(keyboard);
+  glutMouseFunc(mouse);
   glutTimerFunc(0, timer, 0);
 
-  for (std::size_t i = 0; i < 100; i++) {
+  for (std::size_t i = 0; i < 250; i++) {
     WarpMouse(); xangle = 0; yangle = 0;
-    std::this_thread::sleep_for (std::chrono::milliseconds(5));
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
   
   glutShowWindow();
