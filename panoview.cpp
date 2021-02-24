@@ -28,6 +28,7 @@
 #include <cmath>
 #include <cstring>
 #include <climits>
+#include <cstdlib>
 #if defined(_WIN32)
 #include <cwchar>
 #endif
@@ -449,7 +450,9 @@ int main(int argc, char **argv) {
   glutTimerFunc(0, timer, 0);
 
   for (std::size_t i = 0; i < 150; i++) {
-    WarpMouse(); xangle = 0; yangle = 0;
+    WarpMouse(); 
+	xangle = strtod(std::getenv("PANORAMA_XANGLE"), nullptr) ? : 0; 
+	yangle = strtod(std::getenv("PANORAMA_YANGLE"), nullptr) ? : 0; 
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
   
