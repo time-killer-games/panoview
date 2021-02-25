@@ -13,8 +13,6 @@ PANORAMA_YANGLE = initial yangle of the panoramic projection; any integer value 
 
 --------------------------------------------------------------------------------------------------
 
-screenshots:
-
 ![select your panorama](https://i.imgur.com/Rpl7jIs.png)
 
 ![view panoramas in 3D](https://i.imgur.com/pGZsEtN.png)
