@@ -877,6 +877,7 @@ void LoadPanorama(const char *fname) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pngwidth, pngheight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+  XProc::EnvironmentSetVariable("PANORAMA_TEXTURE", fname);
   delete[] data;
 }
 
@@ -934,6 +935,7 @@ void LoadCursor(const char *fname) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pngwidth, pngheight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+  XProc::EnvironmentSetVariable("PANORAMA_POINTER", fname);
   delete[] data;
 }
 
@@ -953,24 +955,22 @@ SDL_Window *hidden = nullptr;
 #endif
 
 void display() {
-  string firstline;
-  std::ifstream conf("panoview.conf");
-  if (conf.is_open()) {
-    if (std::getline(conf, firstline)) {
-      if (firstline.substr(0, 3) == "ID=" && 
-        firstline.length() > 3 && firstline[4] != ' ') {
-        ID = (PROCID)strtoul(StringReplaceAll(firstline, "ID=", "").c_str(), nullptr, 10);
-        if (ID != 0 && XProc::ProcIdExists(ID)) {
-          char *texture; XProc::EnvironFromProcIdEx(ID, "PANORAMA_TEXTURE", &texture);
-          const char *panorama = XProc::EnvironmentGetVariable("PANORAMA_TEXTURE");
-          char *pointer; XProc::EnvironFromProcIdEx(ID, "PANORAMA_POINTER", &pointer);
-          const char *cursor = XProc::EnvironmentGetVariable("PANORAMA_POINTER");
-          if (texture && strcmp(texture, panorama) != 0) { LoadPanorama(texture); }
-          if (texture && strcmp(pointer, cursor) != 0) { LoadCursor(pointer); }
-        }
-      }
-    }
-    conf.close();
+  if (ID != 0 && XProc::ProcIdExists(ID)) {
+    char *texture; XProc::EnvironFromProcIdEx(ID, "PANORAMA_TEXTURE", &texture);
+    string panorama1 = XProc::EnvironmentGetVariable("PANORAMA_TEXTURE");
+	string panorama2 = texture ? : "";
+	
+    char *pointer; XProc::EnvironFromProcIdEx(ID, "PANORAMA_POINTER", &pointer);
+    string cursor1 = XProc::EnvironmentGetVariable("PANORAMA_POINTER");
+	string cursor2 = pointer ? : "";
+	
+	printf("%s\n", texture ? : (char *)"");
+    if (texture && panorama1 != panorama2) {
+	  LoadPanorama(texture);
+	}
+    if (pointer && cursor1 != cursor2) {
+	  LoadCursor(pointer);
+	}
   }
 
   glClearColor(0, 0, 0, 1);
@@ -1179,9 +1179,8 @@ int main(int argc, char **argv) {
   glShadeModel(GL_SMOOTH);
   glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
-  LoadPanorama(panorama.c_str()); LoadCursor(cursor.c_str());
-  XProc::EnvironmentSetVariable("PANORAMA_TEXTURE", panorama.c_str());
-  XProc::EnvironmentSetVariable("PANORAMA_POINTER", cursor.c_str());
+  LoadPanorama(panorama.c_str());
+  LoadCursor(cursor.c_str());
 
   glutSetCursor(GLUT_CURSOR_NONE);
   glutKeyboardFunc(keyboard);
@@ -1192,15 +1191,12 @@ int main(int argc, char **argv) {
   std::ifstream conf("panoview.conf");
   if (conf.is_open()) {
     if (std::getline(conf, firstline)) {
-      if (firstline.substr(0, 3) == "ID=" && 
-        firstline.length() > 3 && firstline[4] != ' ') {
-        ID = (PROCID)strtoul(StringReplaceAll(firstline, "ID=", "").c_str(), nullptr, 10);
-        if (ID != 0 && XProc::ProcIdExists(ID)) {
-          char *xvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_XANGLE", &xvalue);
-          if (xvalue) XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
-          char *yvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_YANGLE", &yvalue);
-          if (yvalue) XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
-        }
+      ID = (PROCID)strtoul(StringReplaceAll(firstline, "ID=", "").c_str(), nullptr, 10);
+      if (ID != 0 && XProc::ProcIdExists(ID)) {
+        char *xvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_XANGLE", &xvalue);
+        if (xvalue) XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
+        char *yvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_YANGLE", &yvalue);
+        if (yvalue) XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
       }
     }
     conf.close();
