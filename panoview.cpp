@@ -1200,7 +1200,7 @@ int main(int argc, char **argv) {
           if (xvalue) XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
           char *yvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_YANGLE", &yvalue);
           if (yvalue) XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
-   	    }
+        }
       }
     }
     conf.close();
