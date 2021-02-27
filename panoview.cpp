@@ -1064,17 +1064,17 @@ void display() {
   if (ID != 0 && XProc::ProcIdExists(ID) && clicked == true) {
     string panorama1 = XProc::EnvironmentGetVariable("PANORAMA_TEXTURE");
     string panorama2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
-	  std::to_string(ID) + " PANORAMA_TEXTURE", &panorama2);
+      std::to_string(ID) + " PANORAMA_TEXTURE", &panorama2);
 	
     string cursor1 = XProc::EnvironmentGetVariable("PANORAMA_POINTER");
     string cursor2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
-	  std::to_string(ID) + " PANORAMA_POINTER", &cursor2);
+      std::to_string(ID) + " PANORAMA_POINTER", &cursor2);
 
 	panorama2 = StringReplaceAll(StringReplaceAll(panorama2, "\"", ""), "\\\"", "\"");
 	cursor2 = StringReplaceAll(StringReplaceAll(cursor2, "\"", ""), "\\\"", "\"");
     if (!panorama2.empty() && panorama1 != panorama2) LoadPanorama(panorama2.c_str());
     if (!cursor2.empty() && cursor1 != cursor2) LoadCursor(cursor2.c_str());
-	clicked = false;
+    clicked = false;
   }
 
   glClearColor(0, 0, 0, 1);
@@ -1216,7 +1216,7 @@ void mouse(int button, int state, int x, int y) {
         int TexX, TexY;
         GetTexelUnderCursor(&TexX, &TexY);
         std::cout << "Texel Clicked: " << TexX << "," << TexY << std::endl;
-		clicked = true;
+        clicked = true;
         break;
       }
   }
