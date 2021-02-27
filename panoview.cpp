@@ -173,6 +173,111 @@ vector<string> StringSplitByFirstEqualsSign(string str) {
   return vec;
 }
 
+void OutputThread(void *handle, string *output) {
+  #if OS_PLATFORM == OS_WINDOWS
+  DWORD dwRead = 0;
+  char buffer[BUFSIZ]; string result;
+  while (ReadFile((HANDLE)handle, buffer, BUFSIZ, &dwRead, nullptr) && dwRead) {
+    buffer[dwRead] = '\0';
+    std::cout << buffer;
+    result.append(buffer, dwRead);
+    *(output) = result;
+  }
+  while (!result.empty() && (result.back() == '\r' || result.back() == '\n')) 
+    result.pop_back();
+  *(output) = result;
+  #elif OS_UNIXLIKE == true
+  ssize_t nRead = 0;
+  char buffer[BUFSIZ]; string result;
+  while ((nRead = read((int)(std::intptr_t)handle, buffer, BUFSIZ)) > 0) {
+    buffer[nRead] = '\0';
+    result.append(buffer, dwRead);
+    *(output) = result;
+  }
+  while (!result.empty() && (result.back() == '\r' || result.back() == '\n')) 
+    result.pop_back();
+  *(output) = result;
+  #endif
+}
+
+void ProcessExecAndReadOutput(string command, string *output) {
+  #if OS_PLATFORM == OS_WINDOWS
+  string result; wstring wstrCommand = widen(command);
+  wchar_t cwstrCommand[32768];
+  wcsncpy_s(cwstrCommand, 32768, wstrCommand.c_str(), 32768);
+  bool proceed = true;
+  HANDLE hStdInPipeRead = nullptr;
+  HANDLE hStdInPipeWrite = nullptr;
+  HANDLE hStdOutPipeRead = nullptr;
+  HANDLE hStdOutPipeWrite = nullptr;
+  SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), nullptr, true };
+  proceed = CreatePipe(&hStdInPipeRead, &hStdInPipeWrite, &sa, 0);
+  if (proceed == false) return;
+  proceed = CreatePipe(&hStdOutPipeRead, &hStdOutPipeWrite, &sa, 0);
+  if (proceed == false) return;
+  STARTUPINFOW si = { 0 };
+  si.cb = sizeof(STARTUPINFOW);
+  si.dwFlags = STARTF_USESTDHANDLES;
+  si.hStdError = hStdOutPipeWrite;
+  si.hStdOutput = hStdOutPipeWrite;
+  si.hStdInput = hStdInPipeRead;
+  PROCESS_INFORMATION pi = { 0 };
+  if (CreateProcessW(nullptr, cwstrCommand, nullptr, nullptr, true, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+    CloseHandle(hStdOutPipeWrite);
+    CloseHandle(hStdInPipeRead); MSG msg;
+    HANDLE waitHandles[] = { pi.hProcess, hStdOutPipeRead };
+    std::thread outthrd(OutputThread, (void *)hStdOutPipeRead, output);
+    while (MsgWaitForMultipleObjects(2, waitHandles, false, 5, QS_ALLEVENTS) != WAIT_OBJECT_0) {
+      while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+      }
+    }
+    outthrd.join();
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    CloseHandle(hStdOutPipeRead);
+    CloseHandle(hStdInPipeWrite);
+  }
+  #elif OS_UNIXLIKE == true
+  int infp, outfp;
+  int p_stdin[2];
+  int p_stdout[2];
+  if (pipe(p_stdin) == -1)
+    return;
+  if (pipe(p_stdout) == -1) {
+    close(p_stdin[0]);
+    close(p_stdin[1]);
+    return;
+  }
+  PROCID pid = fork();
+  if (pid < 0) {
+    close(p_stdin[0]);
+    close(p_stdin[1]);
+    close(p_stdout[0]);
+    close(p_stdout[1]);
+    return;
+  } else if (pid == 0) {
+    close(p_stdin[1]);
+    dup2(p_stdin[0], 0);
+    close(p_stdout[0]);
+    dup2(p_stdout[1], 1);
+    dup2(open("/dev/null", O_RDONLY), 2);
+    for (int i = 3; i < 4096; i++)
+      close(i);
+    setsid();
+    execl("/bin/sh", "/bin/sh", "-c", command.c_str(), nullptr);
+    exit(0);
+  }
+  close(p_stdin[0]);
+  close(p_stdout[1]);
+  infp = p_stdin[1];
+  outfp = p_stdout[0];
+  std::thread outthrd(OutputThread, (void *)(std::intptr_t)outfp, output);
+  outthrd.join();
+  #endif
+}
+
 #if OS_PLATFORM == OS_WINDOWS
 enum MEMTYP {
   MEMCMD,
@@ -954,18 +1059,22 @@ void DrawCursor(GLuint texid, int curx, int cury, int curwidth, int curheight) {
 SDL_Window *hidden = nullptr;
 #endif
 
+bool clicked = false;
 void display() {
-  if (ID != 0 && XProc::ProcIdExists(ID)) {
-    char *texture; XProc::EnvironFromProcIdEx(ID, "PANORAMA_TEXTURE", &texture);
+  if (ID != 0 && XProc::ProcIdExists(ID) && clicked == true) {
     string panorama1 = XProc::EnvironmentGetVariable("PANORAMA_TEXTURE");
-    string panorama2 = texture ? : "";
+    string panorama2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
+	  std::to_string(ID) + " PANORAMA_TEXTURE", &panorama2);
 	
-    char *pointer; XProc::EnvironFromProcIdEx(ID, "PANORAMA_POINTER", &pointer);
     string cursor1 = XProc::EnvironmentGetVariable("PANORAMA_POINTER");
-    string cursor2 = pointer ? : "";
+    string cursor2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
+	  std::to_string(ID) + " PANORAMA_POINTER", &cursor2);
 
-    if (texture && panorama1 != panorama2) { LoadPanorama(texture); }
-    if (pointer && cursor1 != cursor2) { LoadCursor(pointer); }
+	panorama2 = StringReplaceAll(StringReplaceAll(panorama2, "\"", ""), "\\\"", "\"");
+	cursor2 = StringReplaceAll(StringReplaceAll(cursor2, "\"", ""), "\\\"", "\"");
+    if (!panorama2.empty() && panorama1 != panorama2) LoadPanorama(panorama2.c_str());
+    if (!cursor2.empty() && cursor1 != cursor2) LoadCursor(cursor2.c_str());
+	clicked = false;
   }
 
   glClearColor(0, 0, 0, 1);
@@ -1107,6 +1216,7 @@ void mouse(int button, int state, int x, int y) {
         int TexX, TexY;
         GetTexelUnderCursor(&TexX, &TexY);
         std::cout << "Texel Clicked: " << TexX << "," << TexY << std::endl;
+		clicked = true;
         break;
       }
   }
