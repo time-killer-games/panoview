@@ -958,11 +958,11 @@ void display() {
   if (ID != 0 && XProc::ProcIdExists(ID)) {
     char *texture; XProc::EnvironFromProcIdEx(ID, "PANORAMA_TEXTURE", &texture);
     string panorama1 = XProc::EnvironmentGetVariable("PANORAMA_TEXTURE");
-	string panorama2 = texture ? : "";
+    string panorama2 = texture ? : "";
 	
     char *pointer; XProc::EnvironFromProcIdEx(ID, "PANORAMA_POINTER", &pointer);
     string cursor1 = XProc::EnvironmentGetVariable("PANORAMA_POINTER");
-	string cursor2 = pointer ? : "";
+    string cursor2 = pointer ? : "";
 
     if (texture && panorama1 != panorama2) { LoadPanorama(texture); }
     if (pointer && cursor1 != cursor2) { LoadCursor(pointer); }
