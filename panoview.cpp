@@ -963,14 +963,9 @@ void display() {
     char *pointer; XProc::EnvironFromProcIdEx(ID, "PANORAMA_POINTER", &pointer);
     string cursor1 = XProc::EnvironmentGetVariable("PANORAMA_POINTER");
 	string cursor2 = pointer ? : "";
-	
-	printf("%s\n", texture ? : (char *)"");
-    if (texture && panorama1 != panorama2) {
-	  LoadPanorama(texture);
-	}
-    if (pointer && cursor1 != cursor2) {
-	  LoadCursor(pointer);
-	}
+
+    if (texture && panorama1 != panorama2) { LoadPanorama(texture); }
+    if (pointer && cursor1 != cursor2) { LoadCursor(pointer); }
   }
 
   glClearColor(0, 0, 0, 1);
