@@ -1070,8 +1070,8 @@ void display() {
     string cursor2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
       std::to_string(ID) + " PANORAMA_POINTER", &cursor2);
 
-	panorama2 = StringReplaceAll(StringReplaceAll(panorama2, "\"", ""), "\\\"", "\"");
-	cursor2 = StringReplaceAll(StringReplaceAll(cursor2, "\"", ""), "\\\"", "\"");
+    panorama2 = StringReplaceAll(StringReplaceAll(panorama2, "\"", ""), "\\\"", "\"");
+    cursor2 = StringReplaceAll(StringReplaceAll(cursor2, "\"", ""), "\\\"", "\"");
     if (!panorama2.empty() && panorama1 != panorama2) LoadPanorama(panorama2.c_str());
     if (!cursor2.empty() && cursor1 != cursor2) LoadCursor(cursor2.c_str());
     clicked = false;
