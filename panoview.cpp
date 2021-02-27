@@ -1209,8 +1209,8 @@ int main(int argc, char **argv) {
   
   for (size_t i = 0; i < 150; i++) {
     WarpMouse();
-	xangle = initxangle;
-	yangle = inityangle;
+    xangle = initxangle;
+    yangle = inityangle;
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
   
