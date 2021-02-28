@@ -119,12 +119,12 @@
 #error Unexpected value for UINTPTR_MAX; OS_ARCHITECTURE, as a result, is undefined!
 #endif
 
-#define KEEP_XANGLE "361"
-#define KEEP_YANGLE "-91"
-
 #if OS_PLATFORM == OS_WINDOWS
 #define GL_CLAMP_TO_EDGE 0x812F
 #endif
+
+#define KEEP_XANGLE "361"
+#define KEEP_YANGLE "-91"
 
 #if OS_UNIXLIKE == true
 typedef pid_t PROCID;
@@ -1068,29 +1068,17 @@ void display() {
     string panorama1 = XProc::EnvironmentGetVariable("PANORAMA_TEXTURE");
     string panorama2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
       std::to_string(ID) + " PANORAMA_TEXTURE", &panorama2);
+    panorama2 = StringReplaceAll(panorama2, "\\\"", "\"");
+	if (panorama2.length() >= 2) {
+      panorama2 = panorama2.substr(1, panorama2.length() - 2);
+    }
 	
     string cursor1 = XProc::EnvironmentGetVariable("PANORAMA_POINTER");
     string cursor2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
       std::to_string(ID) + " PANORAMA_POINTER", &cursor2);
-
-    char *xvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_XANGLE", &xvalue);
-    if (xvalue && strcmp(xvalue, KEEP_XANGLE) != 0) {
-      XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
-      xangle = strtod(xvalue, nullptr);
-    }
-    char *yvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_YANGLE", &yvalue);
-    if (yvalue && strcmp(yvalue, KEEP_YANGLE) != 0) {
-      XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
-      yangle = strtod(yvalue, nullptr);
-    }
-
-    panorama2 = StringReplaceAll(panorama2, "\\\"", "\"");
-	if (panorama2.length() >= 2) {
-      panorama2 = panorama2.substr(1, panorama2.length() - 1);
-    }
     cursor2 = StringReplaceAll(cursor2, "\\\"", "\"");
     if (cursor2.length() >= 2) {
-      cursor2 = cursor2.substr(1, cursor2.length() - 1);
+      cursor2 = cursor2.substr(1, cursor2.length() - 2);
     }
 
     if (!panorama2.empty() && panorama1 != panorama2) LoadPanorama(panorama2.c_str());
@@ -1360,11 +1348,11 @@ int main(int argc, char **argv) {
       ID = (PROCID)strtoul(StringReplaceAll(firstline, "ID=", "").c_str(), nullptr, 10);
       if (ID != 0 && XProc::ProcIdExists(ID)) {
         char *xvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_XANGLE", &xvalue);
-        if (xvalue && strcmp(xvalue, KEEP_XANGLE) != 0) {
+        if (xvalue) {
           XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
         }
         char *yvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_YANGLE", &yvalue);
-        if (yvalue && strcmp(yvalue, KEEP_YANGLE) != 0) {
+        if (yvalue) {
           XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
         }
       }
