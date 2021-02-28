@@ -1272,6 +1272,47 @@ int main(int argc, char **argv) {
   dialog_module::widget_set_owner((char *)"-1");
   #endif
 
+  PROCID procId; string exefile;
+  XProc::ProcIdFromSelf(&procId);
+  #if OS_PLATFORM == OS_WINDOWS
+  HANDLE procHandle = OpenProcessWithDebugPrivilege(procId);
+  if (procHandle != nullptr) {
+    wchar_t exe[MAX_PATH]; DWORD size = MAX_PATH;
+    if (QueryFullProcessImageNameW(procHandle, 0, exe, &size)) {
+      exefile = narrow(exe);
+    }
+  }
+  CloseHandle(procHandle);
+  #elif OS_PLATFORM == OS_MACOS
+  char exe[PROC_PIDPATHINFO_MAXSIZE];
+  if (proc_pidpath(procId, exe, sizeof(exe)) > 0) {
+    exefile = exe;
+  }
+  #elif OS_PLATFORM == OS_LINUX
+  char exe[PATH_MAX]; 
+  string symLink = string("/proc/") + to_string(procId) + string("/exe");
+  if (realpath(symLink.c_str(), exe)) {
+    exefile = exe;
+  }
+  #elif OS_PLATFORM == OS_FREEBSD
+  int mib[4]; size_t s;
+  mib[0] = CTL_KERN;
+  mib[1] = KERN_PROC;
+  mib[2] = KERN_PROC_PATHNAME;
+  mib[3] = procId;
+  if (sysctl(mib, 4, nullptr, &s, nullptr, 0) == 0) {
+    string str1; str1.resize(s, '\0');
+    char *exe = str1.data();
+    if (sysctl(mib, 4, exe, &s, nullptr, 0) == 0) {
+      exefile = exe;
+    }
+  }
+  #endif
+
+  string cwd; if (exefile.find_last_of("/\\") != string::npos)
+  cwd = exefile.substr(0, exefile.find_last_of("/\\"));
+  XProc::DirectorySetCurrentWorking(cwd.c_str());
+
   dialog_module::widget_set_icon((char *)"icon.png");
   panorama = dialog_module::get_open_filename_ext((char *)"Portable Network Graphic (*.png)|*.png;*.PNG",
   (char *)"burning_within.png", (char *)"examples", (char *)"Choose a 360 Degree Cylindrical Panoramic Image");
