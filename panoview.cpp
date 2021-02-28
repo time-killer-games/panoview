@@ -1070,10 +1070,17 @@ void display() {
     string cursor2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
       std::to_string(ID) + " PANORAMA_POINTER", &cursor2);
 
+    char *xvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_XANGLE", &xvalue);
+    if (xvalue) XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
+    char *yvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_YANGLE", &yvalue);
+    if (yvalue) XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
+
     panorama2 = StringReplaceAll(StringReplaceAll(panorama2, "\"", ""), "\\\"", "\"");
     cursor2 = StringReplaceAll(StringReplaceAll(cursor2, "\"", ""), "\\\"", "\"");
     if (!panorama2.empty() && panorama1 != panorama2) LoadPanorama(panorama2.c_str());
     if (!cursor2.empty() && cursor1 != cursor2) LoadCursor(cursor2.c_str());
+    xangle = strtod(xvalue, nullptr);
+    yangle = strtod(yvalue, nullptr);
     clicked = false;
   }
 
