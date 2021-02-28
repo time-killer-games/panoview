@@ -1263,14 +1263,7 @@ int main(int argc, char **argv) {
 
   glutDisplayFunc(display);
   glutHideWindow();
-
   glClearColor(0, 0, 0, 1);
-  string panorama; if (argc == 1) {
-  #if OS_PLATFORM == OS_WINDOWS
-  dialog_module::widget_set_owner((char *)std::to_string((std::uintptr_t)GetDesktopWindow()).c_str());
-  #else
-  dialog_module::widget_set_owner((char *)"-1");
-  #endif
 
   PROCID procId; string exefile;
   XProc::ProcIdFromSelf(&procId);
@@ -1312,6 +1305,13 @@ int main(int argc, char **argv) {
   string cwd; if (exefile.find_last_of("/\\") != string::npos)
   cwd = exefile.substr(0, exefile.find_last_of("/\\"));
   XProc::DirectorySetCurrentWorking(cwd.c_str());
+
+  string panorama; if (argc == 1) {
+  #if OS_PLATFORM == OS_WINDOWS
+  dialog_module::widget_set_owner((char *)std::to_string((std::uintptr_t)GetDesktopWindow()).c_str());
+  #else
+  dialog_module::widget_set_owner((char *)"-1");
+  #endif
 
   dialog_module::widget_set_icon((char *)"icon.png");
   panorama = dialog_module::get_open_filename_ext((char *)"Portable Network Graphic (*.png)|*.png;*.PNG",
