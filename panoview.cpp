@@ -1242,7 +1242,6 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam) {
 } // anonymous namespace
 
 int main(int argc, char **argv) {
-  if (argc == 2) { return 0; }
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE);
 
