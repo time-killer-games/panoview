@@ -119,6 +119,9 @@
 #error Unexpected value for UINTPTR_MAX; OS_ARCHITECTURE, as a result, is undefined!
 #endif
 
+#define KEEP_XANGLE "361"
+#define KEEP_YANGLE "-91"
+
 #if OS_PLATFORM == OS_WINDOWS
 #define GL_CLAMP_TO_EDGE 0x812F
 #endif
@@ -1071,16 +1074,27 @@ void display() {
       std::to_string(ID) + " PANORAMA_POINTER", &cursor2);
 
     char *xvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_XANGLE", &xvalue);
-    if (xvalue) XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
+    if (xvalue && strcmp(xvalue, KEEP_XANGLE) != 0) {
+      XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
+      xangle = strtod(xvalue, nullptr);
+    }
     char *yvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_YANGLE", &yvalue);
-    if (yvalue) XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
+    if (yvalue && strcmp(yvalue, KEEP_YANGLE) != 0) {
+      XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
+      yangle = strtod(yvalue, nullptr);
+    }
 
-    panorama2 = StringReplaceAll(StringReplaceAll(panorama2, "\"", ""), "\\\"", "\"");
-    cursor2 = StringReplaceAll(StringReplaceAll(cursor2, "\"", ""), "\\\"", "\"");
+    panorama2 = StringReplaceAll(panorama2, "\\\"", "\"");
+	if (panorama2.length() >= 2) {
+      panorama2 = panorama2.substr(1, panorama2.length() - 1);
+    }
+    cursor2 = StringReplaceAll(cursor2, "\\\"", "\"");
+    if (cursor2.length() >= 2) {
+      cursor2 = cursor2.substr(1, cursor2.length() - 1);
+    }
+
     if (!panorama2.empty() && panorama1 != panorama2) LoadPanorama(panorama2.c_str());
     if (!cursor2.empty() && cursor1 != cursor2) LoadCursor(cursor2.c_str());
-    xangle = strtod(xvalue, nullptr);
-    yangle = strtod(yvalue, nullptr);
     clicked = false;
   }
 
@@ -1346,9 +1360,13 @@ int main(int argc, char **argv) {
       ID = (PROCID)strtoul(StringReplaceAll(firstline, "ID=", "").c_str(), nullptr, 10);
       if (ID != 0 && XProc::ProcIdExists(ID)) {
         char *xvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_XANGLE", &xvalue);
-        if (xvalue) XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
+        if (xvalue && strcmp(xvalue, KEEP_XANGLE) != 0) {
+          XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
+        }
         char *yvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_YANGLE", &yvalue);
-        if (yvalue) XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
+        if (yvalue && strcmp(yvalue, KEEP_YANGLE) != 0) {
+          XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
+        }
       }
     }
     conf.close();
@@ -1356,6 +1374,8 @@ int main(int argc, char **argv) {
 
   string str1 = XProc::EnvironmentGetVariable("PANORAMA_XANGLE");
   string str2 = XProc::EnvironmentGetVariable("PANORAMA_YANGLE");
+  XProc::EnvironmentSetVariable("PANORAMA_KEEPXANGLE", KEEP_XANGLE);
+  XProc::EnvironmentSetVariable("PANORAMA_KEEPYANGLE", KEEP_YANGLE);
   double initxangle = strtod((!str1.empty()) ? str1.c_str() : "0", nullptr); 
   double inityangle = strtod((!str2.empty()) ? str2.c_str() : "0", nullptr);
   
