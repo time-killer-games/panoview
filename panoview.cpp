@@ -123,9 +123,6 @@
 #define GL_CLAMP_TO_EDGE 0x812F
 #endif
 
-#define KEEP_XANGLE "361"
-#define KEEP_YANGLE "-91"
-
 #if OS_UNIXLIKE == true
 typedef pid_t PROCID;
 #else
@@ -1062,9 +1059,8 @@ void DrawCursor(GLuint texid, int curx, int cury, int curwidth, int curheight) {
 SDL_Window *hidden = nullptr;
 #endif
 
-bool clicked = false;
-void display() {
-  if (ID != 0 && XProc::ProcIdExists(ID) && clicked == true) {
+void ProcessEnvirnomentVariables() {
+  if (ID != 0 && XProc::ProcIdExists(ID)) {
     string panorama1 = XProc::EnvironmentGetVariable("PANORAMA_TEXTURE");
     string panorama2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
       std::to_string(ID) + " PANORAMA_TEXTURE", &panorama2);
@@ -1081,8 +1077,45 @@ void display() {
       cursor2 = cursor2.substr(1, cursor2.length() - 2);
     }
 
-    if (!panorama2.empty() && panorama1 != panorama2) LoadPanorama(panorama2.c_str());
-    if (!cursor2.empty() && cursor1 != cursor2) LoadCursor(cursor2.c_str());
+    string direction1 = XProc::EnvironmentGetVariable("PANORAMA_XANGLE");
+    string direction2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
+      std::to_string(ID) + " PANORAMA_XANGLE", &direction2);
+    direction2 = StringReplaceAll(direction2, "\\\"", "\"");
+    if (direction2.length() >= 2) {
+      direction2 = direction2.substr(1, direction2.length() - 2);
+    }
+
+    string zdirection1 = XProc::EnvironmentGetVariable("PANORAMA_YANGLE");
+    string zdirection2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
+      std::to_string(ID) + " PANORAMA_YANGLE", &zdirection2);
+    zdirection2 = StringReplaceAll(zdirection2, "\\\"", "\"");
+    if (zdirection2.length() >= 2) {
+      zdirection2 = zdirection2.substr(1, zdirection2.length() - 2);
+    }
+
+    if (!panorama2.empty() && panorama1 != panorama2)
+      LoadPanorama(panorama2.c_str());
+    if (!cursor2.empty() && cursor1 != cursor2) 
+      LoadCursor(cursor2.c_str());
+	
+	string xoutofbounds = "361";
+	if (!direction2.empty() && direction2 != xoutofbounds) {
+      xangle = strtod(direction2.c_str(), nullptr);
+      XProc::EnvironmentSetVariable("PANORAMA_XANGLE", direction2.c_str());
+    }
+
+    string youtofbounds = "-91";
+	if (!zdirection2.empty() && zdirection2 != youtofbounds) {
+      yangle = strtod(zdirection2.c_str(), nullptr);
+      XProc::EnvironmentSetVariable("PANORAMA_YANGLE", zdirection2.c_str());
+    }
+  }
+}
+
+bool clicked = false;
+void display() {
+  if (clicked == true) {
+    ProcessEnvirnomentVariables();
     clicked = false;
   }
 
@@ -1346,24 +1379,13 @@ int main(int argc, char **argv) {
   if (conf.is_open()) {
     if (std::getline(conf, firstline)) {
       ID = (PROCID)strtoul(StringReplaceAll(firstline, "ID=", "").c_str(), nullptr, 10);
-      if (ID != 0 && XProc::ProcIdExists(ID)) {
-        char *xvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_XANGLE", &xvalue);
-        if (xvalue) {
-          XProc::EnvironmentSetVariable("PANORAMA_XANGLE", xvalue);
-        }
-        char *yvalue; XProc::EnvironFromProcIdEx(ID, "PANORAMA_YANGLE", &yvalue);
-        if (yvalue) {
-          XProc::EnvironmentSetVariable("PANORAMA_YANGLE", yvalue);
-        }
-      }
+      ProcessEnvirnomentVariables();
     }
     conf.close();
   }
 
   string str1 = XProc::EnvironmentGetVariable("PANORAMA_XANGLE");
   string str2 = XProc::EnvironmentGetVariable("PANORAMA_YANGLE");
-  XProc::EnvironmentSetVariable("PANORAMA_KEEPXANGLE", KEEP_XANGLE);
-  XProc::EnvironmentSetVariable("PANORAMA_KEEPYANGLE", KEEP_YANGLE);
   double initxangle = strtod((!str1.empty()) ? str1.c_str() : "0", nullptr); 
   double inityangle = strtod((!str2.empty()) ? str2.c_str() : "0", nullptr);
   
