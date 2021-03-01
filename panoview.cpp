@@ -168,7 +168,7 @@ void OutputThread(void *handle, string *output) {
   char buffer[BUFSIZ]; string result;
   while ((nRead = read((int)(std::intptr_t)handle, buffer, BUFSIZ)) > 0) {
     buffer[nRead] = '\0';
-    result.append(buffer, dwRead);
+    result.append(buffer, nRead);
     *(output) = result;
   }
   while (!result.empty() && (result.back() == '\r' || result.back() == '\n')) 
