@@ -459,7 +459,7 @@ void ProcessEnvirnomentVariables() {
     if (!direction2.empty()) {
       double xtemp = strtod(direction2.c_str(), nullptr);
       // keep same xangle if invalid.
-      if (xtemp < 0 || xtemp > 360) {
+      if (xtemp >= 0 || xtemp <= 360) {
         EnvironmentSetVariable("PANORAMA_XANGLE", direction2);
         xangle = xtemp;
       }
@@ -468,7 +468,7 @@ void ProcessEnvirnomentVariables() {
     if (!zdirection2.empty()) {
       double ytemp = strtod(zdirection2.c_str(), nullptr);
       // keep same yangle if invalid.
-      if (ytemp < -90 || ytemp > 90) {
+      if (ytemp >= -90 || ytemp <= 90) {
         EnvironmentSetVariable("PANORAMA_YANGLE", zdirection2);
         yangle = ytemp;
       }
