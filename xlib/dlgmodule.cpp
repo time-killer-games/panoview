@@ -195,13 +195,12 @@ bool file_exists(string fname) {
 
 string filename_absolute(string fname) {
   char result[PATH_MAX];
-  if (fname == "") fname = "./";
   if (realpath(fname.c_str(), result)) {
     if (file_exists(result)) {
       return result;
     }
   }
-  return "/";
+  return "";
 }
 
 string filename_name(string fname) {
@@ -799,10 +798,8 @@ char *get_open_filename_ext(char *filter, char *fname, char *dir, char *title) {
   string str_title = add_escaping(title, true, "Open");
   string caption_previous = caption;
   caption = (str_title == "Open") ? "Open" : title;
-  char *cfname = strdup(filename_absolute(fname).c_str());
-  string str_fname = basename(cfname);
-  free(cfname);
-  string str_dir = dirname(dir);
+  string str_fname = filename_name(filename_absolute(fname));
+  string str_dir = filename_absolute(dir);
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
@@ -848,10 +845,8 @@ char *get_open_filenames_ext(char *filter, char *fname, char *dir, char *title) 
   string str_title = add_escaping(title, true, "Open");
   string caption_previous = caption;
   caption = (str_title == "Open") ? "Open" : title;
-  char *cfname = strdup(filename_absolute(fname).c_str());
-  string str_fname = basename(cfname);
-  free(cfname);
-  string str_dir = dirname(dir);
+  string str_fname = filename_name(filename_absolute(fname));
+  string str_dir = filename_absolute(dir);
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
@@ -904,10 +899,8 @@ char *get_save_filename_ext(char *filter, char *fname, char *dir, char *title) {
   string str_title = add_escaping(title, true, "Save As");
   string caption_previous = caption;
   caption = (str_title == "Save As") ? "Save As" : title;
-  char *cfname = strdup(filename_absolute(fname).c_str());
-  string str_fname = basename(cfname);
-  free(cfname);
-  string str_dir = dirname(dir);
+  string str_fname = filename_name(filename_absolute(fname));
+  string str_dir = filename_absolute(dir);
   string str_iconflag = (dm_dialogengine == dm_zenity) ? " --window-icon=\"" : " --icon \"";
   if (current_icon == "") current_icon = filename_absolute("assets/icon.png");
   string str_icon = file_exists(current_icon) ? str_iconflag + add_escaping(current_icon, false, "") + string("\"") : "";
