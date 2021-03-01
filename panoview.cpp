@@ -426,55 +426,51 @@ SDL_Window *hidden = nullptr;
 #endif
 
 void ProcessEnvirnomentVariables() {
-  string panorama1 = EnvironmentGetVariable("PANORAMA_TEXTURE");
-  string panorama2; ProcessExecAndReadOutput("\"" + cwd + 
-    "/xproc\" --env-from-pid 0 PANORAMA_TEXTURE", &panorama2);
-  panorama2 = StringReplaceAll(panorama2, "\\\"", "\"");
-  if (panorama2.length() >= 2) {
-    panorama2 = panorama2.substr(1, panorama2.length() - 2);
+  string panorama; ProcessExecAndReadOutput("\"" + cwd + 
+    "/xproc\" --env-from-pid 0 PANORAMA_TEXTURE", &panorama);
+  panorama = StringReplaceAll(panorama, "\\\"", "\"");
+  if (panorama.length() >= 2) {
+    panorama = panorama.substr(1, panorama.length() - 2);
   }
 	
-  string cursor1 = EnvironmentGetVariable("PANORAMA_POINTER");
-  string cursor2; ProcessExecAndReadOutput("\"" + cwd + 
-    "/xproc\" --env-from-pid 0 PANORAMA_POINTER", &cursor2);
-  cursor2 = StringReplaceAll(cursor2, "\\\"", "\"");
-  if (cursor2.length() >= 2) {
-    cursor2 = cursor2.substr(1, cursor2.length() - 2);
+  string cursor; ProcessExecAndReadOutput("\"" + cwd + 
+    "/xproc\" --env-from-pid 0 PANORAMA_POINTER", &cursor);
+  cursor = StringReplaceAll(cursor, "\\\"", "\"");
+  if (cursor.length() >= 2) {
+    cursor = cursor.substr(1, cursor.length() - 2);
   }
 
-  string direction1 = EnvironmentGetVariable("PANORAMA_XANGLE");
-  string direction2; ProcessExecAndReadOutput("\"" + cwd + 
-    "/xproc\" --env-from-pid 0 PANORAMA_XANGLE", &direction2);
-  direction2 = StringReplaceAll(direction2, "\\\"", "\"");
-  if (direction2.length() >= 2) {
-    direction2 = direction2.substr(1, direction2.length() - 2);
+  string direction; ProcessExecAndReadOutput("\"" + cwd + 
+    "/xproc\" --env-from-pid 0 PANORAMA_XANGLE", &direction);
+  direction = StringReplaceAll(direction, "\\\"", "\"");
+  if (direction.length() >= 2) {
+    direction = direction.substr(1, direction.length() - 2);
   }
 
-  string zdirection1 = EnvironmentGetVariable("PANORAMA_YANGLE");
-  string zdirection2; ProcessExecAndReadOutput("\"" + cwd + 
-    "/xproc\" --env-from-pid 0 PANORAMA_YANGLE", &zdirection2);
-  zdirection2 = StringReplaceAll(zdirection2, "\\\"", "\"");
-  if (zdirection2.length() >= 2) {
-    zdirection2 = zdirection2.substr(1, zdirection2.length() - 2);
+  string zdirection; ProcessExecAndReadOutput("\"" + cwd + 
+    "/xproc\" --env-from-pid 0 PANORAMA_YANGLE", &zdirection);
+  zdirection = StringReplaceAll(zdirection, "\\\"", "\"");
+  if (zdirection.length() >= 2) {
+    zdirection = zdirection.substr(1, zdirection.length() - 2);
   }
 
-  if (!panorama2.empty() && panorama1 != panorama2)
-    LoadPanorama(panorama2.c_str());
-  if (!cursor2.empty() && cursor1 != cursor2) 
-    LoadCursor(cursor2.c_str());
+  if (!panorama.empty())
+    LoadPanorama(panorama.c_str());
+  if (!cursor.empty()) 
+    LoadCursor(cursor.c_str());
 
-  if (!direction2.empty()) {
-    double xtemp = strtod(direction2.c_str(), nullptr);
+  if (!direction.empty()) {
+    double xtemp = strtod(direction.c_str(), nullptr);
     if (xtemp != KEEP_XANGLE) {
-      EnvironmentSetVariable("PANORAMA_XANGLE", direction2);
+      EnvironmentSetVariable("PANORAMA_XANGLE", direction);
       xangle = xtemp;
     }
   }
 
-  if (!zdirection2.empty()) {
-    double ytemp = strtod(zdirection2.c_str(), nullptr);
+  if (!zdirection.empty()) {
+    double ytemp = strtod(zdirection.c_str(), nullptr);
     if (ytemp != KEEP_YANGLE) {
-      EnvironmentSetVariable("PANORAMA_YANGLE", zdirection2);
+      EnvironmentSetVariable("PANORAMA_YANGLE", zdirection);
       yangle = ytemp;
     }
   }
