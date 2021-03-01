@@ -74,8 +74,10 @@
 
 #if OS_UNIXLIKE == true
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <signal.h>
 #include <unistd.h>
+#include <fcntl.h>
 #endif
 
 #if OS_PLATFORM == OS_MACOS
