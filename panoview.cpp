@@ -456,7 +456,7 @@ void ProcessEnvirnomentVariables() {
     if (!cursor2.empty() && cursor1 != cursor2) 
       LoadCursor(cursor2.c_str());
 
-	if (!direction2.empty()) {
+    if (!direction2.empty()) {
       double xtemp = strtod(direction2.c_str(), nullptr);
       // keep same xangle if invalid.
       if (xtemp < 0 || xtemp > 360) {
@@ -465,8 +465,8 @@ void ProcessEnvirnomentVariables() {
       }
     }
 
-	if (!zdirection2.empty()) {
-	  double ytemp = strtod(zdirection2.c_str(), nullptr);
+    if (!zdirection2.empty()) {
+      double ytemp = strtod(zdirection2.c_str(), nullptr);
       // keep same yangle if invalid.
       if (ytemp < -90 || ytemp > 90) {
         EnvironmentSetVariable("PANORAMA_YANGLE", zdirection2);
