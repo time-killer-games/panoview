@@ -719,7 +719,7 @@ int main(int argc, char **argv) {
   #endif
 
   DirectorySetCurrentWorking(cwd + "/examples");
-  dialog_module::widget_set_icon((char *)"icon.png");
+  dialog_module::widget_set_icon((char *)(cwd + "/icon.png").c_str());
   panorama = dialog_module::get_open_filename_ext((char *)"Portable Network Graphic (*.png)|*.png;*.PNG",
   (char *)"burning_within.png", (char *)"", (char *)"Choose a 360 Degree Cylindrical Panoramic Image");
   if (strcmp(panorama.c_str(), "") == 0) { glutDestroyWindow(window); exit(0); } } else { panorama = argv[1]; }
