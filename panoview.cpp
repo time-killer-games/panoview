@@ -79,11 +79,14 @@
 #endif
 
 #if OS_PLATFORM == OS_MACOS
+#include <libproc.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <GLUT/glut.h>
 #else
 #if OS_PLATFORM == OS_WINDOWS
 #include <windows.h>
+#elif OS_PLATFORM == OS_FREEBSD
+#include <sys/sysctl.h>
 #endif
 #include <GL/glut.h>
 #include <SDL2/SDL.h>
