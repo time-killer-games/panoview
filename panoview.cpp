@@ -709,8 +709,7 @@ int main(int argc, char **argv) {
   #endif
 
   string cwd; if (exefile.find_last_of("/\\") != string::npos)
-  cwd = exefile.substr(0, exefile.find_last_of("/\\") + 1);
-  DirectorySetCurrentWorking(cwd + "examples");
+  cwd = exefile.substr(0, exefile.find_last_of("/\\"));
 
   string panorama; if (argc == 1) {
   #if OS_PLATFORM == OS_WINDOWS
@@ -719,11 +718,13 @@ int main(int argc, char **argv) {
   dialog_module::widget_set_owner((char *)"-1");
   #endif
 
+  DirectorySetCurrentWorking(cwd + "/examples");
   dialog_module::widget_set_icon((char *)"icon.png");
   panorama = dialog_module::get_open_filename_ext((char *)"Portable Network Graphic (*.png)|*.png;*.PNG",
-  (char *)"burning_within.png", (char *)"examples", (char *)"Choose a 360 Degree Cylindrical Panoramic Image");
+  (char *)"burning_within.png", (char *)"", (char *)"Choose a 360 Degree Cylindrical Panoramic Image");
   if (strcmp(panorama.c_str(), "") == 0) { glutDestroyWindow(window); exit(0); } } else { panorama = argv[1]; }
   string cursor = (argc > 2) ? argv[2] : "cursor.png";
+  DirectorySetCurrentWorking(cwd);
 
   glClearDepth(1);
   glEnable(GL_DEPTH_TEST);
