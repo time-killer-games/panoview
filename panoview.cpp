@@ -55,7 +55,6 @@
 #include <chrono>
 #include <algorithm>
 #include <iostream>
-#include <fstream>
 
 #if defined(_WIN32)
 #include <cwchar>
@@ -733,15 +732,7 @@ int main(int argc, char **argv) {
   glutMouseFunc(mouse);
   glutTimerFunc(0, timer, 0);
   
-  string firstline;
-  std::ifstream conf("panoview.conf");
-  if (conf.is_open()) {
-    if (std::getline(conf, firstline)) {
-      ProcessEnvirnomentVariables();
-    }
-    conf.close();
-  }
-
+  ProcessEnvirnomentVariables();
   string str1 = EnvironmentGetVariable("PANORAMA_XANGLE");
   string str2 = EnvironmentGetVariable("PANORAMA_YANGLE");
   double initxangle = strtod((!str1.empty()) ? str1.c_str() : "0", nullptr); 
