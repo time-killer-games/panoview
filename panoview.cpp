@@ -99,6 +99,10 @@ typedef pid_t PROCID;
 typedef DWORD PROCID;
 #endif
 
+// magic numbers...
+#define KEEP_XANGLE 361
+#define KEEP_YANGLE -91
+
 using std::string;
 using std::to_string;
 using std::wstring;
@@ -459,7 +463,7 @@ void ProcessEnvirnomentVariables() {
     if (!direction2.empty()) {
       double xtemp = strtod(direction2.c_str(), nullptr);
       // keep same xangle if invalid.
-      if (xtemp >= 0 || xtemp <= 360) {
+      if (xtemp != KEEP_XANGLE) {
         EnvironmentSetVariable("PANORAMA_XANGLE", direction2);
         xangle = xtemp;
       }
@@ -468,7 +472,7 @@ void ProcessEnvirnomentVariables() {
     if (!zdirection2.empty()) {
       double ytemp = strtod(zdirection2.c_str(), nullptr);
       // keep same yangle if invalid.
-      if (ytemp >= -90 || ytemp <= 90) {
+      if (ytemp != KEEP_YANGLE) {
         EnvironmentSetVariable("PANORAMA_YANGLE", zdirection2);
         yangle = ytemp;
       }
