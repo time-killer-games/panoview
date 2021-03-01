@@ -116,7 +116,6 @@ using std::size_t;
 
 namespace {
 
-PROCID ID = 0;
 const double PI = 3.141592653589793;
 
 #if OS_PLATFORM == OS_WINDOWS
@@ -427,58 +426,52 @@ SDL_Window *hidden = nullptr;
 #endif
 
 void ProcessEnvirnomentVariables() {
-  if (ID != 0) {
-    string panorama1 = EnvironmentGetVariable("PANORAMA_TEXTURE");
-    string panorama2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
-      std::to_string(ID) + " PANORAMA_TEXTURE", &panorama2);
-    panorama2 = StringReplaceAll(panorama2, "\\\"", "\"");
-	if (panorama2.length() >= 2) {
-      panorama2 = panorama2.substr(1, panorama2.length() - 2);
-    }
+  string panorama1 = EnvironmentGetVariable("PANORAMA_TEXTURE");
+  string panorama2; ProcessExecAndReadOutput("xproc --env-from-pid 0 PANORAMA_TEXTURE", &panorama2);
+  panorama2 = StringReplaceAll(panorama2, "\\\"", "\"");
+  if (panorama2.length() >= 2) {
+    panorama2 = panorama2.substr(1, panorama2.length() - 2);
+  }
 	
-    string cursor1 = EnvironmentGetVariable("PANORAMA_POINTER");
-    string cursor2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
-      std::to_string(ID) + " PANORAMA_POINTER", &cursor2);
-    cursor2 = StringReplaceAll(cursor2, "\\\"", "\"");
-    if (cursor2.length() >= 2) {
-      cursor2 = cursor2.substr(1, cursor2.length() - 2);
+  string cursor1 = EnvironmentGetVariable("PANORAMA_POINTER");
+  string cursor2; ProcessExecAndReadOutput("xproc --env-from-pid 0 PANORAMA_POINTER", &cursor2);
+  cursor2 = StringReplaceAll(cursor2, "\\\"", "\"");
+  if (cursor2.length() >= 2) {
+    cursor2 = cursor2.substr(1, cursor2.length() - 2);
+  }
+
+  string direction1 = EnvironmentGetVariable("PANORAMA_XANGLE");
+  string direction2; ProcessExecAndReadOutput("xproc --env-from-pid 0 PANORAMA_XANGLE", &direction2);
+  direction2 = StringReplaceAll(direction2, "\\\"", "\"");
+  if (direction2.length() >= 2) {
+    direction2 = direction2.substr(1, direction2.length() - 2);
+  }
+
+  string zdirection1 = EnvironmentGetVariable("PANORAMA_YANGLE");
+  string zdirection2; ProcessExecAndReadOutput("xproc --env-from-pid 0 PANORAMA_YANGLE", &zdirection2);
+  zdirection2 = StringReplaceAll(zdirection2, "\\\"", "\"");
+  if (zdirection2.length() >= 2) {
+    zdirection2 = zdirection2.substr(1, zdirection2.length() - 2);
+  }
+
+  if (!panorama2.empty() && panorama1 != panorama2)
+    LoadPanorama(panorama2.c_str());
+  if (!cursor2.empty() && cursor1 != cursor2) 
+    LoadCursor(cursor2.c_str());
+
+  if (!direction2.empty()) {
+    double xtemp = strtod(direction2.c_str(), nullptr);
+    if (xtemp != KEEP_XANGLE) {
+      EnvironmentSetVariable("PANORAMA_XANGLE", direction2);
+      xangle = xtemp;
     }
+  }
 
-    string direction1 = EnvironmentGetVariable("PANORAMA_XANGLE");
-    string direction2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
-      std::to_string(ID) + " PANORAMA_XANGLE", &direction2);
-    direction2 = StringReplaceAll(direction2, "\\\"", "\"");
-    if (direction2.length() >= 2) {
-      direction2 = direction2.substr(1, direction2.length() - 2);
-    }
-
-    string zdirection1 = EnvironmentGetVariable("PANORAMA_YANGLE");
-    string zdirection2; ProcessExecAndReadOutput("xproc --env-from-pid " + 
-      std::to_string(ID) + " PANORAMA_YANGLE", &zdirection2);
-    zdirection2 = StringReplaceAll(zdirection2, "\\\"", "\"");
-    if (zdirection2.length() >= 2) {
-      zdirection2 = zdirection2.substr(1, zdirection2.length() - 2);
-    }
-
-    if (!panorama2.empty() && panorama1 != panorama2)
-      LoadPanorama(panorama2.c_str());
-    if (!cursor2.empty() && cursor1 != cursor2) 
-      LoadCursor(cursor2.c_str());
-
-    if (!direction2.empty()) {
-      double xtemp = strtod(direction2.c_str(), nullptr);
-      if (xtemp != KEEP_XANGLE) {
-        EnvironmentSetVariable("PANORAMA_XANGLE", direction2);
-        xangle = xtemp;
-      }
-    }
-
-    if (!zdirection2.empty()) {
-      double ytemp = strtod(zdirection2.c_str(), nullptr);
-      if (ytemp != KEEP_YANGLE) {
-        EnvironmentSetVariable("PANORAMA_YANGLE", zdirection2);
-        yangle = ytemp;
-      }
+  if (!zdirection2.empty()) {
+    double ytemp = strtod(zdirection2.c_str(), nullptr);
+    if (ytemp != KEEP_YANGLE) {
+      EnvironmentSetVariable("PANORAMA_YANGLE", zdirection2);
+      yangle = ytemp;
     }
   }
 }
@@ -590,7 +583,7 @@ void WarpMouse() {
   int hdw = CGDisplayPixelsWide(kCGDirectMainDisplay) / 2;
   int hdh = CGDisplayPixelsHigh(kCGDirectMainDisplay) / 2;
   CGDisplayMoveCursorToPoint(kCGDirectMainDisplay, CGPointMake(hdw, hdh));
-  CGSetLocalEventsSuppressionInterval(0.0);
+  CGAssociateMouseAndMouseCursorPosition(true);
   PanoramaSetHorzAngle((hdw - cursor.x) / 20);
   PanoramaSetVertAngle((hdh - cursor.y) / 20);
   #endif
@@ -744,7 +737,6 @@ int main(int argc, char **argv) {
   std::ifstream conf("panoview.conf");
   if (conf.is_open()) {
     if (std::getline(conf, firstline)) {
-      ID = (PROCID)strtoul(StringReplaceAll(firstline, "ID=", "").c_str(), nullptr, 10);
       ProcessEnvirnomentVariables();
     }
     conf.close();
