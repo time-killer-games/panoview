@@ -709,8 +709,8 @@ int main(int argc, char **argv) {
   #endif
 
   string cwd; if (exefile.find_last_of("/\\") != string::npos)
-  cwd = exefile.substr(0, exefile.find_last_of("/\\"));
-  DirectorySetCurrentWorking(cwd);
+  cwd = exefile.substr(0, exefile.find_last_of("/\\") + 1);
+  DirectorySetCurrentWorking(cwd + "examples");
 
   string panorama; if (argc == 1) {
   #if OS_PLATFORM == OS_WINDOWS
