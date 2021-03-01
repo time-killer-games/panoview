@@ -115,6 +115,7 @@ using std::size_t;
 
 namespace {
 
+string cwd;
 const double PI = 3.141592653589793;
 
 #if OS_PLATFORM == OS_WINDOWS
@@ -426,36 +427,40 @@ SDL_Window *hidden = nullptr;
 
 void ProcessEnvirnomentVariables() {
   string panorama1 = EnvironmentGetVariable("PANORAMA_TEXTURE");
-  string panorama2; ProcessExecAndReadOutput("xproc --env-from-pid 0 PANORAMA_TEXTURE", &panorama2);
+  string panorama2; ProcessExecAndReadOutput("\"" + cwd + 
+    "/xproc\" --env-from-pid 0 PANORAMA_TEXTURE", &panorama2);
   panorama2 = StringReplaceAll(panorama2, "\\\"", "\"");
   if (panorama2.length() >= 2) {
     panorama2 = panorama2.substr(1, panorama2.length() - 2);
   }
 	
   string cursor1 = EnvironmentGetVariable("PANORAMA_POINTER");
-  string cursor2; ProcessExecAndReadOutput("xproc --env-from-pid 0 PANORAMA_POINTER", &cursor2);
+  string cursor2; ProcessExecAndReadOutput("\"" + cwd + 
+    "/xproc\" --env-from-pid 0 PANORAMA_POINTER", &cursor2);
   cursor2 = StringReplaceAll(cursor2, "\\\"", "\"");
   if (cursor2.length() >= 2) {
     cursor2 = cursor2.substr(1, cursor2.length() - 2);
   }
 
   string direction1 = EnvironmentGetVariable("PANORAMA_XANGLE");
-  string direction2; ProcessExecAndReadOutput("xproc --env-from-pid 0 PANORAMA_XANGLE", &direction2);
+  string direction2; ProcessExecAndReadOutput("\"" + cwd + 
+    "/xproc\" --env-from-pid 0 PANORAMA_XANGLE", &direction2);
   direction2 = StringReplaceAll(direction2, "\\\"", "\"");
   if (direction2.length() >= 2) {
     direction2 = direction2.substr(1, direction2.length() - 2);
   }
 
   string zdirection1 = EnvironmentGetVariable("PANORAMA_YANGLE");
-  string zdirection2; ProcessExecAndReadOutput("xproc --env-from-pid 0 PANORAMA_YANGLE", &zdirection2);
+  string zdirection2; ProcessExecAndReadOutput("\"" + cwd + 
+    "/xproc\" --env-from-pid 0 PANORAMA_YANGLE", &zdirection2);
   zdirection2 = StringReplaceAll(zdirection2, "\\\"", "\"");
   if (zdirection2.length() >= 2) {
     zdirection2 = zdirection2.substr(1, zdirection2.length() - 2);
   }
 
-  if (!panorama2.empty() && panorama1 != panorama2)
+  if (!panorama2.empty())
     LoadPanorama(panorama2.c_str());
-  if (!cursor2.empty() && cursor1 != cursor2) 
+  if (!cursor2.empty()) 
     LoadCursor(cursor2.c_str());
 
   if (!direction2.empty()) {
@@ -700,7 +705,7 @@ int main(int argc, char **argv) {
   }
   #endif
 
-  string cwd; if (exefile.find_last_of("/\\") != string::npos)
+  if (exefile.find_last_of("/\\") != string::npos)
   cwd = exefile.substr(0, exefile.find_last_of("/\\"));
 
   string panorama; if (argc == 1) {
