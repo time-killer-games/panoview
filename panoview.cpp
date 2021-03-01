@@ -458,9 +458,9 @@ void ProcessEnvirnomentVariables() {
     zdirection2 = zdirection2.substr(1, zdirection2.length() - 2);
   }
 
-  if (!panorama2.empty())
+  if (!panorama2.empty() && panorama1 != panorama2)
     LoadPanorama(panorama2.c_str());
-  if (!cursor2.empty()) 
+  if (!cursor2.empty() && cursor1 != cursor2) 
     LoadCursor(cursor2.c_str());
 
   if (!direction2.empty()) {
