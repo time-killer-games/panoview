@@ -429,6 +429,10 @@ void DrawCursor(GLuint texid, int curx, int cury, int curwidth, int curheight) {
 SDL_Window *hidden = nullptr;
 #endif
 
+#if OS_UNIXLIKE == true
+bool ProcIdExists(PROCID procId);
+#endif
+
 void ProcIdEnumerate(PROCID **procId, int *size) {
   vector<PROCID> vec; int i = 0;
   #if OS_PLATFORM == OS_WINDOWS
