@@ -91,7 +91,6 @@
 #include <proc/readproc.h>
 #elif OS_PLATFORM == OS_FREEBSD
 #include <sys/sysctl.h>
-#include <sys/user.h>
 #include <libutil.h>
 #endif
 #include <GL/glut.h>
@@ -557,7 +556,7 @@ void ParentProcIdFromProcIdSkipSh(PROCID procId, PROCID *parentProcId) {
   if (cmdline.length() > 2) {
     if (cmdline.substr(0, 9) == "\"/bin/sh\"") {
       ParentProcIdFromProcIdSkipSh(*parentProcId, parentProcId);
-	}
+    }
   }
 }
 
