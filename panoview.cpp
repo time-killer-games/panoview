@@ -86,8 +86,12 @@
 #else
 #if OS_PLATFORM == OS_WINDOWS
 #include <windows.h>
+#include <tlhelp32.h>
+#elif OS_PLATFORM == OS_LINUX
+#include <proc/readproc.h>
 #elif OS_PLATFORM == OS_FREEBSD
 #include <sys/sysctl.h>
+#include <libutil.h>
 #endif
 #include <GL/glut.h>
 #include <SDL2/SDL.h>
@@ -425,39 +429,171 @@ void DrawCursor(GLuint texid, int curx, int cury, int curwidth, int curheight) {
 SDL_Window *hidden = nullptr;
 #endif
 
-void ProcessEnvirnomentVariables() {
-  string panorama; ProcessExecAndReadOutput("\"" + cwd + 
-    "/xproc\" --env-from-pid 0 PANORAMA_TEXTURE", &panorama);
-  panorama = StringReplaceAll(panorama, "\\\"", "\"");
-  if (panorama.length() >= 2) {
-    panorama = panorama.substr(1, panorama.length() - 2);
+void ProcIdEnumerate(PROCID **procId, int *size) {
+  vector<PROCID> vec; int i = 0;
+  #if OS_PLATFORM == OS_WINDOWS
+  HANDLE hp = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  PROCESSENTRY32 pe = { 0 };
+  pe.dwSize = sizeof(PROCESSENTRY32);
+  if (Process32First(hp, &pe)) {
+    do {
+      vec.push_back(pe.th32ProcessID); i++;
+    } while (Process32Next(hp, &pe));
   }
-	
-  string cursor; ProcessExecAndReadOutput("\"" + cwd + 
-    "/xproc\" --env-from-pid 0 PANORAMA_POINTER", &cursor);
-  cursor = StringReplaceAll(cursor, "\\\"", "\"");
-  if (cursor.length() >= 2) {
-    cursor = cursor.substr(1, cursor.length() - 2);
+  CloseHandle(hp);
+  #elif OS_PLATFORM == OS_MACOS
+  if (ProcIdExists(0)) { vec.push_back(0); i++; }
+  int cntp = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
+  vector<PROCID> proc_info(cntp);
+  std::fill(proc_info.begin(), proc_info.end(), 0);
+  proc_listpids(PROC_ALL_PIDS, 0, &proc_info[0], sizeof(PROCID) * cntp);
+  for (int j = cntp; j > 0; j--) {
+    if (proc_info[j] == 0) { continue; }
+    vec.push_back(proc_info[j]); i++;
+  }
+  #elif OS_PLATFORM == OS_LINUX
+  if (ProcIdExists(0)) { vec.push_back(0); i++; }
+  PROCTAB *proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS);
+  while (proc_t *proc_info = readproc(proc, nullptr)) {
+    vec.push_back(proc_info->tgid); i++;
+    freeproc(proc_info);
+  }
+  closeproc(proc);
+  #elif OS_PLATFORM == OS_FREEBSD
+  int cntp; if (kinfo_proc *proc_info = kinfo_getallproc(&cntp)) {
+    for (int j = 0; j < cntp; j++) {
+      vec.push_back(proc_info[j].ki_pid); i++;
+    }
+    free(proc_info);
+  }
+  #endif
+  *procId = (PROCID *)malloc(sizeof(PROCID) * vec.size());
+  if (procId) {
+    std::copy(vec.begin(), vec.end(), *procId);
+    *size = i;
+  }
+}
+
+bool ProcIdExists(PROCID procId) {
+  #if OS_UNIXLIKE == true
+  return (kill(procId, 0) == 0);
+  #elif OS_PLATFORM == OS_WINDOWS
+  PROCID *buffer; int size;
+  ProcIdEnumerate(&buffer, &size);
+  if (procId) {
+    for (int i = 0; i < size; i++) {
+      if (procId == buffer[i]) {
+        return true;
+      }
+    }
+    free(buffer);
+  }
+  return false;
+  #else
+  return false;
+  #endif
+}
+
+void ParentProcIdFromProcId(PROCID procId, PROCID *parentProcId) {
+  #if OS_PLATFORM == OS_WINDOWS
+  HANDLE hp = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  PROCESSENTRY32 pe = { 0 };
+  pe.dwSize = sizeof(PROCESSENTRY32);
+  if (Process32First(hp, &pe)) {
+    do {
+      if (pe.th32ProcessID == procId) {
+        *parentProcId = pe.th32ParentProcessID;
+        break;
+      }
+    } while (Process32Next(hp, &pe));
+  }
+  CloseHandle(hp);
+  #elif OS_PLATFORM == OS_MACOS
+  proc_bsdinfo proc_info;
+  if (proc_pidinfo(procId, PROC_PIDTBSDINFO, 0, &proc_info, sizeof(proc_info)) > 0) {
+    *parentProcId = proc_info.pbi_ppid;
+  }
+  #elif OS_PLATFORM == OS_LINUX
+  PROCTAB *proc = openproc(PROC_FILLSTATUS | PROC_PID, &procId);
+  if (proc_t *proc_info = readproc(proc, nullptr)) { 
+    *parentProcId = proc_info->ppid;
+    freeproc(proc_info);
+  }
+  closeproc(proc);
+  #elif OS_PLATFORM == OS_FREEBSD
+  if (kinfo_proc *proc_info = kinfo_getproc(procId)) {
+    *parentProcId = proc_info->ki_ppid;
+    free(proc_info);
+  }
+  #endif
+}
+
+void ProcIdFromSelf(PROCID *procId) {
+  #if OS_UNIXLIKE == true
+  *procId = getpid();
+  #elif OS_PLATFORM == OS_WINDOWS
+  *procId = GetCurrentProcessId();
+  #endif
+}
+
+void ParentProcIdFromSelf(PROCID *parentProcId) {
+  #if OS_UNIXLIKE == true
+  *parentProcId = getppid();
+  #elif OS_PLATFORM == OS_WINDOWS
+  ParentProcIdFromProcId(GetCurrentProcessId(), parentProcId);
+  #endif
+}
+
+void ParentProcIdFromProcIdSkipSh(PROCID procId, PROCID *parentProcId) {
+  string cmdline;
+  ParentProcIdFromProcId(procId, parentProcId);
+  ProcessExecAndReadOutput("\"" + cwd + "/xproc\" --cmd-from-pid " + 
+    std::to_string(*parentProcId), &cmdline);
+  if (cmdline.length() > 2) {
+    if (cmdline.substr(0, 9) == "\"/bin/sh\"") {
+      ParentProcIdFromProcIdSkipSh(*parentProcId, parentProcId);
+	}
+  }
+}
+
+void ProcessEnvirnomentVariables() {
+  PROCID procId, parentProcId; ProcIdFromSelf(&procId);
+  ParentProcIdFromProcIdSkipSh(procId, &parentProcId);
+
+  string panorama1 = EnvironmentGetVariable("PANORAMA_TEXTURE");
+  string panorama2; ProcessExecAndReadOutput("\"" + cwd + 
+    "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_TEXTURE", &panorama2);
+  panorama2 = StringReplaceAll(panorama2, "\\\"", "\"");
+  if (panorama2.length() >= 2) {
+    panorama2 = panorama2.substr(1, panorama2.length() - 2);
+  }
+
+  string cursor1 = EnvironmentGetVariable("PANORAMA_POINTER");
+  string cursor2; ProcessExecAndReadOutput("\"" + cwd + 
+    "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_POINTER", &cursor2);
+  cursor2 = StringReplaceAll(cursor2, "\\\"", "\"");
+  if (cursor2.length() >= 2) {
+    cursor2 = cursor2.substr(1, cursor2.length() - 2);
   }
 
   string direction; ProcessExecAndReadOutput("\"" + cwd + 
-    "/xproc\" --env-from-pid 0 PANORAMA_XANGLE", &direction);
+    "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_XANGLE", &direction);
   direction = StringReplaceAll(direction, "\\\"", "\"");
   if (direction.length() >= 2) {
     direction = direction.substr(1, direction.length() - 2);
   }
 
   string zdirection; ProcessExecAndReadOutput("\"" + cwd + 
-    "/xproc\" --env-from-pid 0 PANORAMA_YANGLE", &zdirection);
+    "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_YANGLE", &zdirection);
   zdirection = StringReplaceAll(zdirection, "\\\"", "\"");
   if (zdirection.length() >= 2) {
     zdirection = zdirection.substr(1, zdirection.length() - 2);
   }
 
-  if (!panorama.empty())
-    LoadPanorama(panorama.c_str());
-  if (!cursor.empty()) 
-    LoadCursor(cursor.c_str());
+  if (!panorama2.empty() && panorama1 != panorama2)
+    LoadPanorama(panorama2.c_str());
+  if (!cursor2.empty() && cursor1 != cursor2) 
+    LoadCursor(cursor2.c_str());
 
   if (!direction.empty()) {
     double xtemp = strtod(direction.c_str(), nullptr);
