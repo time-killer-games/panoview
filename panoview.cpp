@@ -566,7 +566,7 @@ void ProcessEnvirnomentVariables() {
   ParentProcIdFromProcIdSkipSh(procId, &parentProcId);
 
   string panorama1 = EnvironmentGetVariable("PANORAMA_TEXTURE");
-  string panorama2; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\\\"", "\"") +
+  string panorama2; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\"", "\\\"") +
     "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_TEXTURE", &panorama2);
   if (panorama2.length() >= 2) {
     panorama2 = panorama2.substr(1, panorama2.length() - 2);
@@ -574,21 +574,21 @@ void ProcessEnvirnomentVariables() {
   }
 
   string cursor1 = EnvironmentGetVariable("PANORAMA_POINTER");
-  string cursor2; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\\\"", "\"") +
+  string cursor2; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\"", "\\\"") +
     "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_POINTER", &cursor2);
   if (cursor2.length() >= 2) {
     cursor2 = cursor2.substr(1, cursor2.length() - 2);
     cursor2 = StringReplaceAll(cursor2, "\\\"", "\"");
   }
 
-  string direction; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\\\"", "\"") +
+  string direction; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\"", "\\\"") +
     "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_XANGLE", &direction);
   if (direction.length() >= 2) {
     direction = direction.substr(1, direction.length() - 2);
     direction = StringReplaceAll(direction, "\\\"", "\"");
   }
 
-  string zdirection; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\\\"", "\"") +
+  string zdirection; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\"", "\\\"") +
     "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_YANGLE", &zdirection);
   if (zdirection.length() >= 2) {
     zdirection = zdirection.substr(1, zdirection.length() - 2);
