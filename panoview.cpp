@@ -69,7 +69,11 @@
 #include <cmath>
 
 #include "Universal/dlgmodule.h"
+#if OS_PLATFORM == OS_WINDOWS
+#include "Win32/libpng-util.h"
+#else
 #include "Universal/lodepng.h"
+#endif
 
 #if OS_UNIXLIKE == true
 #include <sys/types.h>
@@ -314,7 +318,12 @@ bool DirectorySetCurrentWorking(string dname) {
 
 void LoadImage(unsigned char **out, unsigned *pngwidth, unsigned *pngheight, const char *fname) {
   unsigned char *data = nullptr;
+  #if OS_PLATFORM == OS_WINDOWS
+  wstring u8fname = widen(fname); 
+  unsigned error = libpng_decode32_file(&data, pngwidth, pngheight, u8fname.c_str());
+  #else
   unsigned error = lodepng_decode32_file(&data, pngwidth, pngheight, fname);
+  #endif
   if (error) { return; } unsigned width = *pngwidth, height = *pngheight;
 
   const int size = width * height * 4;
