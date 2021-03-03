@@ -561,7 +561,7 @@ void ParentProcIdFromProcIdSkipSh(PROCID procId, PROCID *parentProcId) {
   }
 }
 
-void ProcessEnvirnomentVariables() {
+void UpdateEnvironmentVariables() {
   PROCID procId, parentProcId; ProcIdFromSelf(&procId);
   ParentProcIdFromProcIdSkipSh(procId, &parentProcId);
 
@@ -620,7 +620,7 @@ void ProcessEnvirnomentVariables() {
 bool clicked = false;
 void display() {
   if (clicked == true) {
-    ProcessEnvirnomentVariables();
+    UpdateEnvironmentVariables();
     clicked = false;
   }
 
@@ -874,7 +874,7 @@ int main(int argc, char **argv) {
   glutMouseFunc(mouse);
   glutTimerFunc(0, timer, 0);
   
-  ProcessEnvirnomentVariables();
+  UpdateEnvironmentVariables();
   string str1 = EnvironmentGetVariable("PANORAMA_XANGLE");
   string str2 = EnvironmentGetVariable("PANORAMA_YANGLE");
   double initxangle = strtod((!str1.empty()) ? str1.c_str() : "0", nullptr); 
