@@ -37,7 +37,7 @@
 #include <algorithm>
 
 #include "../Universal/dlgmodule.h"
-#include "../Universal/lodepng.h"
+#include "../Unix/lodepng.h"
 
 #include <sys/types.h>
 #if defined (__APPLE__) && defined(__MACH__)

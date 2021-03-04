@@ -71,8 +71,8 @@
 #include "Universal/dlgmodule.h"
 #if OS_PLATFORM == OS_WINDOWS
 #include "Win32/libpng-util.h"
-#else
-#include "Universal/lodepng.h"
+#elif OS_UNIXLIKE == true
+#include "Unix/lodepng.h"
 #endif
 
 #if OS_UNIXLIKE == true
