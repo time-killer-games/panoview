@@ -24,41 +24,13 @@
  
 */
 
-#define OS_UNKNOWN -1
-#define OS_WINDOWS  0
-#define OS_MACOS    1
-#define OS_LINUX    2
-#define OS_FREEBSD  3
-
-#if defined(_WIN32)
-#define OS_PLATFORM OS_WINDOWS
-#define OS_UNIXLIKE false
-#elif defined(__APPLE__) && defined(__MACH__)
-#define OS_PLATFORM OS_MACOS
-#define OS_UNIXLIKE true
-#elif defined(__linux__) && !defined(__ANDROID__)
-#define OS_PLATFORM OS_LINUX
-#define OS_UNIXLIKE true
-#elif defined(__FreeBSD__)
-#define OS_PLATFORM OS_FREEBSD
-#define OS_UNIXLIKE true
-#endif
-
-#if !defined(OS_PLATFORM)
-#define OS_PLATFORM OS_UNKNOWN
-#define OS_UNIXLIKE false
-#endif
-
 #include <string>
 #include <vector>
 #include <thread>
 #include <chrono>
+#include <sstream>
 #include <algorithm>
 #include <iostream>
-
-#if defined(_WIN32)
-#include <cwchar>
-#endif
 
 #include <cstdlib>
 #include <cstddef>
@@ -68,6 +40,7 @@
 #include <cstdio>
 #include <cmath>
 
+#include "Universal/xproc.h"
 #include "Universal/dlgmodule.h"
 #if OS_PLATFORM == OS_WINDOWS
 #include "Win32/libpng-util.h"
@@ -90,13 +63,8 @@
 #else
 #if OS_PLATFORM == OS_WINDOWS
 #include <windows.h>
-#include <tlhelp32.h>
-#elif OS_PLATFORM == OS_LINUX
-#include <proc/readproc.h>
 #elif OS_PLATFORM == OS_FREEBSD
 #include <sys/sysctl.h>
-#include <sys/user.h>
-#include <libutil.h>
 #endif
 #include <GL/glut.h>
 #include <SDL2/SDL.h>
@@ -126,195 +94,6 @@ namespace {
 
 string cwd;
 const double PI = 3.141592653589793;
-
-#if OS_PLATFORM == OS_WINDOWS
-wstring widen(string str) {
-  size_t wchar_count = str.size() + 1;
-  vector<wchar_t> buf(wchar_count);
-  return wstring { buf.data(), (size_t)MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, buf.data(), (int)wchar_count) };
-}
-
-string narrow(wstring wstr) {
-  int nbytes = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.length(), NULL, 0, NULL, NULL);
-  vector<char> buf(nbytes);
-  return string { buf.data(), (size_t)WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.length(), buf.data(), nbytes, NULL, NULL) };
-}
-#endif
-
-string StringReplaceAll(string str, string substr, string nstr) {
-  size_t pos = 0;
-  while ((pos = str.find(substr, pos)) != string::npos) {
-    str.replace(pos, substr.length(), nstr);
-    pos += nstr.length();
-  }
-  return str;
-}
-
-vector<string> StringSplitByFirstEqualsSign(string str) {
-  size_t pos = 0;
-  vector<string> vec;
-  if ((pos = str.find_first_of("=")) != string::npos) {
-    vec.push_back(str.substr(0, pos));
-    vec.push_back(str.substr(pos + 1));
-  }
-  return vec;
-}
-
-void OutputThread(void *handle, string *output) {
-  #if OS_PLATFORM == OS_WINDOWS
-  DWORD dwRead = 0;
-  char buffer[BUFSIZ]; string result;
-  while (ReadFile((HANDLE)handle, buffer, BUFSIZ, &dwRead, nullptr) && dwRead) {
-    buffer[dwRead] = '\0';
-    std::cout << buffer;
-    result.append(buffer, dwRead);
-    *(output) = result;
-  }
-  while (!result.empty() && (result.back() == '\r' || result.back() == '\n')) 
-    result.pop_back();
-  *(output) = result;
-  #elif OS_UNIXLIKE == true
-  ssize_t nRead = 0;
-  char buffer[BUFSIZ]; string result;
-  while ((nRead = read((int)(std::intptr_t)handle, buffer, BUFSIZ)) > 0) {
-    buffer[nRead] = '\0';
-    result.append(buffer, nRead);
-    *(output) = result;
-  }
-  while (!result.empty() && (result.back() == '\r' || result.back() == '\n')) 
-    result.pop_back();
-  *(output) = result;
-  #endif
-}
-
-void ProcessExecAndReadOutput(string command, string *output) {
-  #if OS_PLATFORM == OS_WINDOWS
-  string result; wstring wstrCommand = widen(command);
-  wchar_t cwstrCommand[32768];
-  wcsncpy_s(cwstrCommand, 32768, wstrCommand.c_str(), 32768);
-  bool proceed = true;
-  HANDLE hStdInPipeRead = nullptr;
-  HANDLE hStdInPipeWrite = nullptr;
-  HANDLE hStdOutPipeRead = nullptr;
-  HANDLE hStdOutPipeWrite = nullptr;
-  SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), nullptr, true };
-  proceed = CreatePipe(&hStdInPipeRead, &hStdInPipeWrite, &sa, 0);
-  if (proceed == false) return;
-  proceed = CreatePipe(&hStdOutPipeRead, &hStdOutPipeWrite, &sa, 0);
-  if (proceed == false) return;
-  STARTUPINFOW si = { 0 };
-  si.cb = sizeof(STARTUPINFOW);
-  si.dwFlags = STARTF_USESTDHANDLES;
-  si.hStdError = hStdOutPipeWrite;
-  si.hStdOutput = hStdOutPipeWrite;
-  si.hStdInput = hStdInPipeRead;
-  PROCESS_INFORMATION pi = { 0 };
-  if (CreateProcessW(nullptr, cwstrCommand, nullptr, nullptr, true, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
-    CloseHandle(hStdOutPipeWrite);
-    CloseHandle(hStdInPipeRead); MSG msg;
-    HANDLE waitHandles[] = { pi.hProcess, hStdOutPipeRead };
-    std::thread outthrd(OutputThread, (void *)hStdOutPipeRead, output);
-    while (MsgWaitForMultipleObjects(2, waitHandles, false, 5, QS_ALLEVENTS) != WAIT_OBJECT_0) {
-      while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-      }
-    }
-    outthrd.join();
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    CloseHandle(hStdOutPipeRead);
-    CloseHandle(hStdInPipeWrite);
-  }
-  #elif OS_UNIXLIKE == true
-  int infp, outfp;
-  int p_stdin[2];
-  int p_stdout[2];
-  if (pipe(p_stdin) == -1)
-    return;
-  if (pipe(p_stdout) == -1) {
-    close(p_stdin[0]);
-    close(p_stdin[1]);
-    return;
-  }
-  PROCID pid = fork();
-  if (pid < 0) {
-    close(p_stdin[0]);
-    close(p_stdin[1]);
-    close(p_stdout[0]);
-    close(p_stdout[1]);
-    return;
-  } else if (pid == 0) {
-    close(p_stdin[1]);
-    dup2(p_stdin[0], 0);
-    close(p_stdout[0]);
-    dup2(p_stdout[1], 1);
-    dup2(open("/dev/null", O_RDONLY), 2);
-    for (int i = 3; i < 4096; i++)
-      close(i);
-    setsid();
-    execl("/bin/sh", "/bin/sh", "-c", command.c_str(), nullptr);
-    exit(0);
-  }
-  close(p_stdin[0]);
-  close(p_stdout[1]);
-  infp = p_stdin[1];
-  outfp = p_stdout[0];
-  std::thread outthrd(OutputThread, (void *)(std::intptr_t)outfp, output);
-  outthrd.join();
-  #endif
-}
-
-string EnvironmentGetVariable(string name) {
-  #if OS_PLATFORM == OS_WINDOWS
-  wchar_t buffer[32767];
-  wstring u8name = widen(name);
-  if (GetEnvironmentVariableW(u8name.c_str(), buffer, 32767) != 0) {
-    return narrow(buffer);
-  }
-  return "";
-  #else
-  char *value = getenv(name.c_str());
-  return value ? value : "";
-  #endif
-}
-
-bool EnvironmentSetVariable(string name, string value) {
-  #if OS_PLATFORM == OS_WINDOWS
-  wstring u8name = widen(name);
-  wstring u8value = widen(value);
-  if (strcmp(value.c_str(), "") == 0) return (SetEnvironmentVariableW(u8name.c_str(), nullptr) != 0);
-  return (SetEnvironmentVariableW(u8name.c_str(), u8value.c_str()) != 0);
-  #else
-  if (strcmp(value.c_str(), "") == 0) return (unsetenv(name.c_str()) == 0);
-  return (setenv(name.c_str(), value.c_str(), 1) == 0);
-  #endif
-}
-
-string DirectoryGetCurrentWorking() {
-  #if OS_PLATFORM == OS_WINDOWS
-  wchar_t u8dname[MAX_PATH];
-  if (GetCurrentDirectoryW(MAX_PATH, u8dname) != 0) {
-	return narrow(u8dname);
-  }
-  return "";
-  #else
-  char dname[PATH_MAX];
-  if (getcwd(dname, sizeof(dname)) != nullptr) {
-    return dname;
-  }
-  return "";
-  #endif
-}
-
-bool DirectorySetCurrentWorking(string dname) {
-  #if OS_PLATFORM == OS_WINDOWS
-  wstring u8dname = widen(dname);
-  return SetCurrentDirectoryW(u8dname.c_str());
-  #else
-  return chdir(dname.c_str());
-  #endif
-}
 
 void LoadImage(unsigned char **out, unsigned *pngwidth, unsigned *pngheight, const char *fname) {
   unsigned char *data = nullptr;
@@ -362,7 +141,6 @@ void LoadPanorama(const char *fname) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pngwidth, pngheight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-  EnvironmentSetVariable("PANORAMA_TEXTURE", fname);
   delete[] data;
 }
 
@@ -420,7 +198,6 @@ void LoadCursor(const char *fname) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pngwidth, pngheight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-  EnvironmentSetVariable("PANORAMA_POINTER", fname);
   delete[] data;
 }
 
@@ -439,180 +216,72 @@ void DrawCursor(GLuint texid, int curx, int cury, int curwidth, int curheight) {
 SDL_Window *hidden = nullptr;
 #endif
 
-#if OS_UNIXLIKE == true
-bool ProcIdExists(PROCID procId);
-#endif
-
-void ProcIdEnumerate(PROCID **procId, int *size) {
-  vector<PROCID> vec; int i = 0;
-  #if OS_PLATFORM == OS_WINDOWS
-  HANDLE hp = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-  PROCESSENTRY32 pe = { 0 };
-  pe.dwSize = sizeof(PROCESSENTRY32);
-  if (Process32First(hp, &pe)) {
-    do {
-      vec.push_back(pe.th32ProcessID); i++;
-    } while (Process32Next(hp, &pe));
-  }
-  CloseHandle(hp);
-  #elif OS_PLATFORM == OS_MACOS
-  if (ProcIdExists(0)) { vec.push_back(0); i++; }
-  int cntp = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
-  vector<PROCID> proc_info(cntp);
-  std::fill(proc_info.begin(), proc_info.end(), 0);
-  proc_listpids(PROC_ALL_PIDS, 0, &proc_info[0], sizeof(PROCID) * cntp);
-  for (int j = cntp; j > 0; j--) {
-    if (proc_info[j] == 0) { continue; }
-    vec.push_back(proc_info[j]); i++;
-  }
-  #elif OS_PLATFORM == OS_LINUX
-  if (ProcIdExists(0)) { vec.push_back(0); i++; }
-  PROCTAB *proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS);
-  while (proc_t *proc_info = readproc(proc, nullptr)) {
-    vec.push_back(proc_info->tgid); i++;
-    freeproc(proc_info);
-  }
-  closeproc(proc);
-  #elif OS_PLATFORM == OS_FREEBSD
-  int cntp; if (kinfo_proc *proc_info = kinfo_getallproc(&cntp)) {
-    for (int j = 0; j < cntp; j++) {
-      vec.push_back(proc_info[j].ki_pid); i++;
-    }
-    free(proc_info);
-  }
-  #endif
-  *procId = (PROCID *)malloc(sizeof(PROCID) * vec.size());
-  if (procId) {
-    std::copy(vec.begin(), vec.end(), *procId);
-    *size = i;
-  }
+vector<string> StringSplit(string str, string delim) {
+  vector<string> vec;
+  std::stringstream sstr(str);
+  string tmp;
+  while (std::getline(sstr, tmp, delim[0]))
+    vec.push_back(tmp);
+  return vec;
 }
 
-bool ProcIdExists(PROCID procId) {
-  #if OS_UNIXLIKE == true
-  return (kill(procId, 0) == 0);
-  #elif OS_PLATFORM == OS_WINDOWS
-  PROCID *buffer; int size;
-  ProcIdEnumerate(&buffer, &size);
-  if (procId) {
-    for (int i = 0; i < size; i++) {
-      if (procId == buffer[i]) {
-        return true;
+void EnvironFromStdInput(string name, string *value) {
+  #if OS_PLATFORM == OS_WINDOWS
+  DWORD bytesAvail = 0;
+  HANDLE hPipe = GetStdHandle(STD_INPUT_HANDLE);
+  FlushFileBuffers(hPipe);
+  if (PeekNamedPipe(hPipe, nullptr, 0, nullptr, &bytesAvail, nullptr)) {
+    DWORD bytesRead = 0;    
+    string buffer; buffer.resize(bytesAvail, '\0');
+    if (PeekNamedPipe(hPipe, &buffer[0], bytesAvail, &bytesRead, nullptr, nullptr)) {
+      vector<string> newlinesplit;
+      newlinesplit = StringSplit(buffer, "\n");
+      for (int i = 0; i < newlinesplit.size(); i++) {
+        vector<string> equalssplit;
+        equalssplit = StringSplitByFirstEqualsSign(newlinesplit[i]);
+        if (equalssplit.size() == 2) {
+          if (equalssplit[0] == name) {
+            *value = equalssplit[1];
+          }
+        }
       }
     }
-    free(buffer);
   }
-  return false;
   #else
-  return false;
-  #endif
-}
-
-void ParentProcIdFromProcId(PROCID procId, PROCID *parentProcId) {
-  #if OS_PLATFORM == OS_WINDOWS
-  HANDLE hp = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-  PROCESSENTRY32 pe = { 0 };
-  pe.dwSize = sizeof(PROCESSENTRY32);
-  if (Process32First(hp, &pe)) {
-    do {
-      if (pe.th32ProcessID == procId) {
-        *parentProcId = pe.th32ParentProcessID;
-        break;
+  string env; char buffer[BUFSIZ]; while (!feof(stdin)) 
+  env.append(buffer, fread(&buffer, sizeof(char), BUFSIZ, stdin));
+  vector<string> newlinesplit;
+  newlinesplit = StringSplit(env, "\n");
+  for (int i = 0; i < newlinesplit.size(); i++) {
+    vector<string> equalssplit;
+    equalssplit = StringSplitByFirstEqualsSign(newlinesplit[i]);
+    if (equalssplit.size() == 2) {
+      if (equalssplit[0] == name) {
+        *value = equalssplit[1];
       }
-    } while (Process32Next(hp, &pe));
-  }
-  CloseHandle(hp);
-  #elif OS_PLATFORM == OS_MACOS
-  proc_bsdinfo proc_info;
-  if (proc_pidinfo(procId, PROC_PIDTBSDINFO, 0, &proc_info, sizeof(proc_info)) > 0) {
-    *parentProcId = proc_info.pbi_ppid;
-  }
-  #elif OS_PLATFORM == OS_LINUX
-  PROCTAB *proc = openproc(PROC_FILLSTATUS | PROC_PID, &procId);
-  if (proc_t *proc_info = readproc(proc, nullptr)) { 
-    *parentProcId = proc_info->ppid;
-    freeproc(proc_info);
-  }
-  closeproc(proc);
-  #elif OS_PLATFORM == OS_FREEBSD
-  if (kinfo_proc *proc_info = kinfo_getproc(procId)) {
-    *parentProcId = proc_info->ki_ppid;
-    free(proc_info);
-  }
-  #endif
-}
-
-void ProcIdFromSelf(PROCID *procId) {
-  #if OS_UNIXLIKE == true
-  *procId = getpid();
-  #elif OS_PLATFORM == OS_WINDOWS
-  *procId = GetCurrentProcessId();
-  #endif
-}
-
-void ParentProcIdFromSelf(PROCID *parentProcId) {
-  #if OS_UNIXLIKE == true
-  *parentProcId = getppid();
-  #elif OS_PLATFORM == OS_WINDOWS
-  ParentProcIdFromProcId(GetCurrentProcessId(), parentProcId);
-  #endif
-}
-
-void ParentProcIdFromProcIdSkipSh(PROCID procId, PROCID *parentProcId) {
-  string cmdline;
-  ParentProcIdFromProcId(procId, parentProcId);
-  ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\\\"", "\"") +
-    "/xproc\" --cmd-from-pid " + std::to_string(*parentProcId), &cmdline);
-  if (cmdline.length() > 2) {
-    if (cmdline.substr(0, 9) == "\"/bin/sh\"") {
-      ParentProcIdFromProcIdSkipSh(*parentProcId, parentProcId);
     }
   }
+  #endif
 }
 
 void UpdateEnvironmentVariables() {
-  PROCID procId, parentProcId; ProcIdFromSelf(&procId);
-  ParentProcIdFromProcIdSkipSh(procId, &parentProcId);
+  string texture; EnvironFromStdInput("PANORAMA_TEXTURE", &texture);
+  string pointer; EnvironFromStdInput("PANORAMA_POINTER", &pointer);
 
-  string panorama1 = EnvironmentGetVariable("PANORAMA_TEXTURE");
-  string panorama2; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\"", "\\\"") +
-    "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_TEXTURE", &panorama2);
-  if (panorama2.length() >= 2) {
-    panorama2 = panorama2.substr(1, panorama2.length() - 2);
-    panorama2 = StringReplaceAll(panorama2, "\\\"", "\"");
-  }
+  string direction;
+  EnvironFromStdInput("PANORAMA_XANGLE", &direction);
 
-  string cursor1 = EnvironmentGetVariable("PANORAMA_POINTER");
-  string cursor2; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\"", "\\\"") +
-    "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_POINTER", &cursor2);
-  if (cursor2.length() >= 2) {
-    cursor2 = cursor2.substr(1, cursor2.length() - 2);
-    cursor2 = StringReplaceAll(cursor2, "\\\"", "\"");
-  }
+  string zdirection;
+  EnvironFromStdInput("PANORAMA_YANGLE", &zdirection);
 
-  string direction; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\"", "\\\"") +
-    "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_XANGLE", &direction);
-  if (direction.length() >= 2) {
-    direction = direction.substr(1, direction.length() - 2);
-    direction = StringReplaceAll(direction, "\\\"", "\"");
-  }
-
-  string zdirection; ProcessExecAndReadOutput("\"" + StringReplaceAll(cwd, "\"", "\\\"") +
-    "/xproc\" --env-from-pid " + std::to_string(parentProcId) + " PANORAMA_YANGLE", &zdirection);
-  if (zdirection.length() >= 2) {
-    zdirection = zdirection.substr(1, zdirection.length() - 2);
-    zdirection = StringReplaceAll(zdirection, "\\\"", "\"");
-  }
-
-  if (!panorama2.empty() && panorama1 != panorama2)
-    LoadPanorama(panorama2.c_str());
-  if (!cursor2.empty() && cursor1 != cursor2) 
-    LoadCursor(cursor2.c_str());
+  if (!texture.empty())
+    LoadPanorama(texture.c_str());
+  if (!pointer.empty()) 
+    LoadCursor(pointer.c_str());
 
   if (!direction.empty()) {
     double xtemp = strtod(direction.c_str(), nullptr);
     if (xtemp != KEEP_XANGLE) {
-      EnvironmentSetVariable("PANORAMA_XANGLE", direction);
       xangle = xtemp;
     }
   }
@@ -620,19 +289,12 @@ void UpdateEnvironmentVariables() {
   if (!zdirection.empty()) {
     double ytemp = strtod(zdirection.c_str(), nullptr);
     if (ytemp != KEEP_YANGLE) {
-      EnvironmentSetVariable("PANORAMA_YANGLE", zdirection);
       yangle = ytemp;
     }
   }
 }
 
-bool clicked = false;
 void display() {
-  if (clicked == true) {
-    UpdateEnvironmentVariables();
-    clicked = false;
-  }
-
   glClearColor(0, 0, 0, 1);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_PROJECTION);
@@ -748,7 +410,6 @@ void timer(int i) {
   AspectRatio = std::fmin(std::fmax(AspectRatio, 0.1), 6);
   MaximumVerticalAngle = (std::atan2((700 / AspectRatio) / 2, 100) * 180.0 / PI) - 30;
   WarpMouse();
-  std::this_thread::sleep_for(std::chrono::milliseconds(5));
   glutPostRedisplay();
   glutTimerFunc(5, timer, 0);
 }
@@ -772,7 +433,8 @@ void mouse(int button, int state, int x, int y) {
         int TexX, TexY;
         GetTexelUnderCursor(&TexX, &TexY);
         std::cout << "Texel Clicked: " << TexX << "," << TexY << std::endl;
-        clicked = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        UpdateEnvironmentVariables();
         break;
       }
   }
@@ -861,13 +523,13 @@ int main(int argc, char **argv) {
   dialog_module::widget_set_owner((char *)"-1");
   #endif
 
-  DirectorySetCurrentWorking(cwd + "/examples");
+  XProc::DirectorySetCurrentWorking((cwd + "/examples").c_str());
   dialog_module::widget_set_icon((char *)(cwd + "/icon.png").c_str());
   panorama = dialog_module::get_open_filename_ext((char *)"Portable Network Graphic (*.png)|*.png;*.PNG",
   (char *)"burning_within.png", (char *)"", (char *)"Choose a 360 Degree Cylindrical Panoramic Image");
   if (strcmp(panorama.c_str(), "") == 0) { glutDestroyWindow(window); exit(0); } } else { panorama = argv[1]; }
-  string cursor = (argc > 2) ? argv[2] : "cursor.png";
-  DirectorySetCurrentWorking(cwd);
+  string cursor = (argc > 2) ? argv[2] : cwd + "/cursor.png";
+  XProc::DirectorySetCurrentWorking(cwd.c_str());
 
   glClearDepth(1);
   glEnable(GL_DEPTH_TEST);
@@ -882,10 +544,9 @@ int main(int argc, char **argv) {
   glutKeyboardFunc(keyboard);
   glutMouseFunc(mouse);
   glutTimerFunc(0, timer, 0);
-  
-  UpdateEnvironmentVariables();
-  string str1 = EnvironmentGetVariable("PANORAMA_XANGLE");
-  string str2 = EnvironmentGetVariable("PANORAMA_YANGLE");
+
+  string str1 = XProc::EnvironmentGetVariable("PANORAMA_XANGLE");
+  string str2 = XProc::EnvironmentGetVariable("PANORAMA_YANGLE");
   double initxangle = strtod((!str1.empty()) ? str1.c_str() : "0", nullptr); 
   double inityangle = strtod((!str2.empty()) ? str2.c_str() : "0", nullptr);
   
