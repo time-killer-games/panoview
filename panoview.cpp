@@ -248,10 +248,14 @@ void EnvironFromStdInput(string name, string *value) {
     }
   }
   #else
-  string env; char buffer[BUFSIZ]; while (!feof(stdin)) 
-  env.append(buffer, fread(&buffer, sizeof(char), BUFSIZ, stdin));
+  string input; char buffer[BUFSIZ]; ssize_t nRead = 0;
+  int flags = fcntl(STDIN_FILENO, F_GETFL, 0); if (-1 == flags) return;
+  while ((nRead = read(fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK), buffer, BUFSIZ)) > 0) {
+    buffer[nRead] = '\0';
+    input.append(buffer, nRead);
+  }
   vector<string> newlinesplit;
-  newlinesplit = StringSplit(env, "\n");
+  newlinesplit = StringSplit(input, "\n");
   for (int i = 0; i < newlinesplit.size(); i++) {
     vector<string> equalssplit;
     equalssplit = StringSplitByFirstEqualsSign(newlinesplit[i]);
