@@ -495,7 +495,7 @@ int main(int argc, char **argv) {
       NSNumber *level = (NSNumber *)(windowInfoDictionary[(id)kCGWindowLayer]);
       if (getpid() == ownerPID.integerValue)) {
         NSNumber *windowID = windowInfoDictionary[(id)kCGWindowNumber];
-		std::cout << "Window ID: " << (std::uintptr_t)windowID.integerValue << std::endl;
+        std::cout << "Window ID: " << (std::uintptr_t)windowID.integerValue << std::endl;
         break;
       }
     }
