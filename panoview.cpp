@@ -59,12 +59,16 @@
 #if OS_PLATFORM == OS_MACOS
 #include <libproc.h>
 #include <CoreGraphics/CoreGraphics.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include <GLUT/glut.h>
 #else
 #if OS_PLATFORM == OS_WINDOWS
 #include <windows.h>
+#elif OS_PLATFORM == OS_LINUX
+#include <GL/glx.h>
 #elif OS_PLATFORM == OS_FREEBSD
 #include <sys/sysctl.h>
+#include <GL/glx.h>
 #endif
 #include <GL/glut.h>
 #include <SDL2/SDL.h>
@@ -474,12 +478,31 @@ int main(int argc, char **argv) {
   if (hidden != nullptr) { SDL_HideWindow(hidden); }
   #endif
 
-  if (window != 0) glutDestroyWindow(window);
   glutInitWindowPosition(0, 0);
   glutInitWindowSize(1, 1);
   window = glutCreateWindow("");
   #if OS_PLATFORM == OS_WINDOWS
   EnumWindows(&EnumWindowsProc, SW_HIDE);
+  std::cout << "Window ID: " << (std::uintptr_t)WindowFromDC(wglGetCurrentDC()) << std::endl;
+  #elif OS_PLATFORM == OS_MACOS
+  CFArrayRef windowArray = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
+  CFIndex windowCount = 0;
+  if ((windowCount = CFArrayGetCount(windowArray))) {
+    for (CFIndex i = 0; i < windowCount; i++) {
+      NSDictionary *windowInfoDictionary =
+      (__bridge NSDictionary *)((CFDictionaryRef)CFArrayGetValueAtIndex(windowArray, i));
+      NSNumber *ownerPID = (NSNumber *)(windowInfoDictionary[(id)kCGWindowOwnerPID]);
+      NSNumber *level = (NSNumber *)(windowInfoDictionary[(id)kCGWindowLayer]);
+      if (getpid() == ownerPID.integerValue)) {
+        NSNumber *windowID = windowInfoDictionary[(id)kCGWindowNumber];
+		std::cout << "Window ID: " << (std::uintptr_t)windowID.integerValue << std::endl;
+        break;
+      }
+    }
+  }
+  CFRelease(windowArray);
+  #elif OS_PLATFORM == OS_LINUX || OS_PLATFORM == OS_FREEBSD
+  std::cout << "Window ID: " << (std::uintptr_t)glXGetCurrentDrawable() << std::endl;
   #endif
 
   glutDisplayFunc(display);
