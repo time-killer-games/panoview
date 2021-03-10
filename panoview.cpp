@@ -489,12 +489,13 @@ int main(int argc, char **argv) {
   CFIndex windowCount = 0;
   if ((windowCount = CFArrayGetCount(windowArray))) {
     for (CFIndex i = 0; i < windowCount; i++) {
-      NSDictionary *windowInfoDictionary =
-      (__bridge NSDictionary *)((CFDictionaryRef)CFArrayGetValueAtIndex(windowArray, i));
-      NSNumber *ownerPID = (NSNumber *)(windowInfoDictionary[(id)kCGWindowOwnerPID]);
-      if (getpid() == ownerPID.integerValue)) {
-        NSNumber *windowID = windowInfoDictionary[(id)kCGWindowNumber];
-        std::cout << "Window ID: " << (std::uintptr_t)windowID.integerValue << std::endl;
+      CFDictionaryRef windowInfoDictionary = (CFDictionaryRef)CFArrayGetValueAtIndex(windowArray, i);
+      CFNumberRef ownerPID = (CFNumberRef)CFDictionaryGetValue(windowInfoDictionary, kCGWindowOwnerPID);
+      pid_t pid; CFNumberGetValue(ownerPID, kCFNumberIntType, &pid);
+      if (getpid() == pid) {
+        CFNumberRef windowID = (CFNumberRef)CFDictionaryGetValue(windowInfoDictionary, kCGWindowNumber);
+        CGWindowID wid; CFNumberGetValue(windowID, kCGWindowIDCFNumberType, &wid);
+        std::cout << "Window ID: " << (std::uintptr_t)wid << std::endl;
         break;
       }
     }
