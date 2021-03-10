@@ -289,6 +289,34 @@ void UpdateEnvironmentVariables() {
   string zdirection;
   EnvironFromStdInput("PANORAMA_YANGLE", &zdirection);
 
+  string okonly; EnvironFromStdInput("MESSAGE_BOX", &okonly);
+  if (!okonly.empty()) std::cout << "Message Box: " <<
+  dialog_module::show_question((char *)okonly.c_str()) << std::endl;
+
+  string yesno; EnvironFromStdInput("QUESTION_BOX", &yesno);
+  if (!yesno.empty()) std::cout << "Question Box: " <<
+  dialog_module::show_question((char *)yesno.c_str()) << std::endl;
+
+  string input; EnvironFromStdInput("INPUT_BOX", &input);
+  if (!input.empty()) std::cout << "Input Box: " <<
+  dialog_module::get_string((char *)input.c_str(), 
+  (char *)"") << std::endl;
+
+  string passwd; EnvironFromStdInput("PASSWORD_BOX", &passwd);
+  if (!passwd.empty()) std::cout << "Password Box: " <<
+  dialog_module::get_password((char *)passwd.c_str(), 
+  (char *)"") << std::endl;
+
+  string open; EnvironFromStdInput("OPEN_FILENAME", &open);
+  if (!open.empty()) std::cout << "Open File: " <<
+  dialog_module::get_open_filename((char *)open.c_str(), 
+  (char *)"") << std::endl;
+
+  string save; EnvironFromStdInput("SAVE_FILENAME", &save);
+  if (!save.empty()) std::cout << "Save File: " <<
+  dialog_module::get_save_filename((char *)save.c_str(), 
+  (char *)"") << std::endl;
+
   if (!texture.empty())
     LoadPanorama(texture.c_str());
   if (!pointer.empty()) 
@@ -614,7 +642,8 @@ int main(int argc, char **argv) {
   #elif OS_PLATFORM == OS_MACOS
   CGDisplayHideCursor(kCGDirectMainDisplay);
   #endif
-  
+
+  dialog_module::widget_set_owner((char *)WindowID.c_str());
   glutMainLoop();
   return 0;
 }
