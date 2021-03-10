@@ -293,20 +293,6 @@ void UpdateEnvironmentVariables() {
   if (!okonly.empty()) std::cout << "Message Box: " <<
   dialog_module::show_question((char *)okonly.c_str()) << std::endl;
 
-  string yesno; EnvironFromStdInput("QUESTION_BOX", &yesno);
-  if (!yesno.empty()) std::cout << "Question Box: " <<
-  dialog_module::show_question((char *)yesno.c_str()) << std::endl;
-
-  string input; EnvironFromStdInput("INPUT_BOX", &input);
-  if (!input.empty()) std::cout << "Input Box: " <<
-  dialog_module::get_string((char *)input.c_str(), 
-  (char *)"") << std::endl;
-
-  string passwd; EnvironFromStdInput("PASSWORD_BOX", &passwd);
-  if (!passwd.empty()) std::cout << "Password Box: " <<
-  dialog_module::get_password((char *)passwd.c_str(), 
-  (char *)"") << std::endl;
-
   string open; EnvironFromStdInput("OPEN_FILENAME", &open);
   if (!open.empty()) std::cout << "Open File: " <<
   dialog_module::get_open_filename((char *)open.c_str(), 
