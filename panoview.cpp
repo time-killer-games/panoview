@@ -78,12 +78,6 @@
 #define GL_CLAMP_TO_EDGE 0x812F
 #endif
 
-#if OS_UNIXLIKE == true
-typedef pid_t PROCID;
-#else
-typedef DWORD PROCID;
-#endif
-
 // magic numbers...
 #define KEEP_XANGLE 361
 #define KEEP_YANGLE -91
@@ -94,12 +88,21 @@ using std::wstring;
 using std::vector;
 using std::size_t;
 
+#if OS_UNIXLIKE == true
+typedef pid_t PROCID;
+#else
+typedef DWORD PROCID;
+#endif
+typedef string wid_t;
+
 namespace {
 
 string cwd;
+wid_t WindowID  = "-1"; 
 const double PI = 3.141592653589793;
 
-void LoadImage(unsigned char **out, unsigned *pngwidth, unsigned *pngheight, const char *fname) {
+void LoadImage(unsigned char **out, unsigned *pngwidth, unsigned *pngheight, 
+  const char *fname) {
   unsigned char *data = nullptr;
   #if OS_PLATFORM == OS_WINDOWS
   wstring u8fname = widen(fname); 
@@ -144,7 +147,8 @@ void LoadPanorama(const char *fname) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pngwidth, pngheight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pngwidth, pngheight, 0, 
+  GL_RGBA, GL_UNSIGNED_BYTE, data);
   delete[] data;
 }
 
@@ -201,7 +205,8 @@ void LoadCursor(const char *fname) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pngwidth, pngheight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, pngwidth, pngheight, 0, 
+  GL_RGBA, GL_UNSIGNED_BYTE, data);
   delete[] data;
 }
 
@@ -237,7 +242,8 @@ void EnvironFromStdInput(string name, string *value) {
   if (PeekNamedPipe(hPipe, nullptr, 0, nullptr, &bytesAvail, nullptr)) {
     DWORD bytesRead = 0;    
     string buffer; buffer.resize(bytesAvail, '\0');
-    if (PeekNamedPipe(hPipe, &buffer[0], bytesAvail, &bytesRead, nullptr, nullptr)) {
+    if (PeekNamedPipe(hPipe, &buffer[0], bytesAvail, &bytesRead, 
+      nullptr, nullptr)) {
       vector<string> newlinesplit;
       newlinesplit = StringSplit(buffer, "\n");
       for (int i = 0; i < newlinesplit.size(); i++) {
@@ -254,7 +260,8 @@ void EnvironFromStdInput(string name, string *value) {
   #else
   string input; char buffer[BUFSIZ]; ssize_t nRead = 0;
   int flags = fcntl(STDIN_FILENO, F_GETFL, 0); if (-1 == flags) return;
-  while ((nRead = read(fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK), buffer, BUFSIZ)) > 0) {
+  while ((nRead = read(fcntl(STDIN_FILENO, F_SETFL, flags | 
+    O_NONBLOCK), buffer, BUFSIZ)) > 0) {
     buffer[nRead] = '\0';
     input.append(buffer, nRead);
   }
@@ -379,7 +386,8 @@ double PanoramaGetVertAngle() {
 double MaximumVerticalAngle;
 void PanoramaSetVertAngle(double vangle) {
   yangle -= vangle;
-  yangle  = std::fmin(std::fmax(yangle, -MaximumVerticalAngle), MaximumVerticalAngle);
+  yangle  = std::fmin(std::fmax(yangle, -MaximumVerticalAngle), 
+  MaximumVerticalAngle);
 }
 
 void WarpMouse() {
@@ -411,7 +419,8 @@ void WarpMouse() {
 
 void GetTexelUnderCursor(int *TexX, int *TexY) {
   *TexX = abs(round(2 - std::fmod((xangle / 360 + 1) * TexWidth, TexWidth)));
-  *TexY = TexHeight - (round(((1 - ((std::tan(yangle * PI / 180.0) * 100) / (700 / AspectRatio))) * TexHeight)) - (TexHeight / 2));
+  *TexY = TexHeight - (round(((1 - ((std::tan(yangle * PI / 180.0) * 100) / 
+  (700 / AspectRatio))) * TexHeight)) - (TexHeight / 2));
 }
 
 void timer(int i) {
@@ -474,35 +483,45 @@ int main(int argc, char **argv) {
   #if OS_PLATFORM != OS_MACOS
   SDL_Init(SDL_INIT_VIDEO);
   hidden = SDL_CreateWindow("hidden",
-  SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 0, 0, SDL_WINDOW_BORDERLESS);
+  SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
+  0, 0, SDL_WINDOW_BORDERLESS);
   if (hidden != nullptr) { SDL_HideWindow(hidden); }
   #endif
 
   glutInitWindowPosition(0, 0);
   glutInitWindowSize(1, 1);
   window = glutCreateWindow("");
+
   #if OS_PLATFORM == OS_WINDOWS
   EnumWindows(&EnumWindowsProc, SW_HIDE);
-  std::cout << "Window ID: " << (std::uintptr_t)WindowFromDC(wglGetCurrentDC()) << std::endl;
+  WindowID = std::to_string((std::uintptr_t)WindowFromDC(wglGetCurrentDC()));
+  std::cout << "Window ID: " << WindowID << std::endl;
   #elif OS_PLATFORM == OS_MACOS
-  CFArrayRef windowArray = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
+  CFArrayRef windowArray = CGWindowListCopyWindowInfo(
+  kCGWindowListOptionAll, kCGNullWindowID);
   CFIndex windowCount = 0;
   if ((windowCount = CFArrayGetCount(windowArray))) {
     for (CFIndex i = 0; i < windowCount; i++) {
-      CFDictionaryRef windowInfoDictionary = (CFDictionaryRef)CFArrayGetValueAtIndex(windowArray, i);
-      CFNumberRef ownerPID = (CFNumberRef)CFDictionaryGetValue(windowInfoDictionary, kCGWindowOwnerPID);
+      CFDictionaryRef windowInfoDictionary = 
+      (CFDictionaryRef)CFArrayGetValueAtIndex(windowArray, i);
+      CFNumberRef ownerPID = (CFNumberRef)CFDictionaryGetValue(
+      windowInfoDictionary, kCGWindowOwnerPID);
       PROCID pid; CFNumberGetValue(ownerPID, kCFNumberIntType, &pid);
       if (getpid() == pid) {
-        CFNumberRef windowID = (CFNumberRef)CFDictionaryGetValue(windowInfoDictionary, kCGWindowNumber);
-        CGWindowID wid; CFNumberGetValue(windowID, kCGWindowIDCFNumberType, &wid);
-        std::cout << "Window ID: " << (std::uintptr_t)wid << std::endl;
+        CFNumberRef windowID = (CFNumberRef)CFDictionaryGetValue(
+        windowInfoDictionary, kCGWindowNumber);
+        CGWindowID CoreGraphicsWindowID; CFNumberGetValue(windowID, 
+        kCGWindowIDCFNumberType, &CoreGraphicsWindowID);
+        WindowID = std::to_string((std::uintptr_t)CoreGraphicsWindowID);
+        std::cout << "Window ID: " << WindowID << std::endl;
         break;
       }
     }
   }
   CFRelease(windowArray);
   #elif OS_PLATFORM == OS_LINUX || OS_PLATFORM == OS_FREEBSD
-  std::cout << "Window ID: " << (std::uintptr_t)glXGetCurrentDrawable() << std::endl;
+  WindowID = std::to_string((std::uintptr_t)glXGetCurrentDrawable());
+  std::cout << "Window ID: " << WindowID << std::endl;
   #endif
 
   glutDisplayFunc(display);
@@ -545,16 +564,20 @@ int main(int argc, char **argv) {
 
   string panorama; if (argc == 1) {
   #if OS_PLATFORM == OS_WINDOWS
-  dialog_module::widget_set_owner((char *)std::to_string((std::uintptr_t)GetDesktopWindow()).c_str());
+  dialog_module::widget_set_owner((char *)std::to_string(
+  (std::uintptr_t)GetDesktopWindow()).c_str());
   #else
   dialog_module::widget_set_owner((char *)"-1");
   #endif
 
   XProc::DirectorySetCurrentWorking((cwd + "/examples").c_str());
   dialog_module::widget_set_icon((char *)(cwd + "/icon.png").c_str());
-  panorama = dialog_module::get_open_filename_ext((char *)"Portable Network Graphic (*.png)|*.png;*.PNG",
-  (char *)"burning_within.png", (char *)"", (char *)"Choose a 360 Degree Cylindrical Panoramic Image");
-  if (strcmp(panorama.c_str(), "") == 0) { glutDestroyWindow(window); exit(0); } } else { panorama = argv[1]; }
+  panorama = dialog_module::get_open_filename_ext((char *)
+  "Portable Network Graphic (*.png)|*.png;*.PNG",
+  (char *)"burning_within.png", (char *)"", 
+  (char *)"Choose a 360 Degree Cylindrical Panoramic Image");
+  if (strcmp(panorama.c_str(), "") == 0) { 
+  glutDestroyWindow(window); exit(0); } } else { panorama = argv[1]; }
   string cursor = (argc > 2) ? argv[2] : cwd + "/cursor.png";
   XProc::DirectorySetCurrentWorking(cwd.c_str());
 
