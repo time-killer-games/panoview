@@ -297,7 +297,7 @@ void DisplayCursor(bool display) {
 
 void DisableWindow(bool disable) {
   #if OS_PLATFORM == OS_WINDOWS
-  EnableWindow(strtoull(WindowID.c_str(), nullptr, 10), !disable);
+  EnableWindow((HWND)strtoull(WindowID.c_str(), nullptr, 10), !disable);
   #endif
 }
 
