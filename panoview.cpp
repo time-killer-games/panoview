@@ -295,12 +295,6 @@ void DisplayCursor(bool display) {
   #endif
 }
 
-void DisableWindow(bool disable) {
-  #if OS_PLATFORM == OS_WINDOWS
-  EnableWindow((HWND)strtoull(WindowID.c_str(), nullptr, 10), !disable);
-  #endif
-}
-
 void UpdateEnvironmentVariables() {
   string texture; EnvironFromStdInput("PANORAMA_TEXTURE", &texture);
   string pointer; EnvironFromStdInput("PANORAMA_POINTER", &pointer);
@@ -310,33 +304,6 @@ void UpdateEnvironmentVariables() {
 
   string zdirection;
   EnvironFromStdInput("PANORAMA_YANGLE", &zdirection);
-
-  string okonly; EnvironFromStdInput("MESSAGE_BOX", &okonly);
-  if (!okonly.empty()) {
-    DisableWindow(true);
-    DisplayCursor(true); std::cout << "Message Box: " <<
-    dialog_module::show_message((char *)okonly.c_str()) << std::endl;
-    DisplayCursor(false); 
-    DisableWindow(false);
-  }
-
-  string open; EnvironFromStdInput("OPEN_FILENAME", &open);
-  if (!open.empty()) {
-    DisableWindow(true);
-    DisplayCursor(true); std::cout << "Open File: " <<
-    dialog_module::get_open_filename((char *)open.c_str(), 
-    (char *)"") << std::endl; DisplayCursor(false);
-    DisableWindow(false);
-  }
-
-  string save; EnvironFromStdInput("SAVE_FILENAME", &save);
-  if (!save.empty()) {
-    DisableWindow(true);
-    DisplayCursor(true); std::cout << "Save File: " <<
-    dialog_module::get_save_filename((char *)save.c_str(), 
-    (char *)"") << std::endl; DisplayCursor(false);
-    DisableWindow(false);
-  }
 
   if (!texture.empty())
     LoadPanorama(texture.c_str());
@@ -638,8 +605,6 @@ int main(int argc, char **argv) {
 
   LoadPanorama(panorama.c_str());
   LoadCursor(cursor.c_str());
-
-  glutSetCursor(GLUT_CURSOR_NONE);
   glutKeyboardFunc(keyboard);
   glutMouseFunc(mouse);
   glutTimerFunc(0, timer, 0);
@@ -660,11 +625,9 @@ int main(int argc, char **argv) {
   glutFullScreen();
   #if OS_PLATFORM == OS_WINDOWS
   EnumWindows(&EnumWindowsProc, SW_SHOW);
-  #elif OS_PLATFORM == OS_MACOS
-  CGDisplayHideCursor(kCGDirectMainDisplay);
   #endif
 
-  dialog_module::widget_set_owner((char *)WindowID.c_str());
+  DisplayCursor(false);
   glutMainLoop();
   return 0;
 }
