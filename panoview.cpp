@@ -287,7 +287,7 @@ void DisplayCursor(bool display) {
     CGDisplayHideCursor(kCGDirectMainDisplay);
   }
   #else
-  if (dispplay) {
+  if (display) {
     glutSetCursor(GLUT_CURSOR_INHERIT);
   } else {
     glutSetCursor(GLUT_CURSOR_NONE);
