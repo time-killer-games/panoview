@@ -291,7 +291,7 @@ void UpdateEnvironmentVariables() {
 
   string okonly; EnvironFromStdInput("MESSAGE_BOX", &okonly);
   if (!okonly.empty()) std::cout << "Message Box: " <<
-  dialog_module::show_question((char *)okonly.c_str()) << std::endl;
+  dialog_module::show_message((char *)okonly.c_str()) << std::endl;
 
   string open; EnvironFromStdInput("OPEN_FILENAME", &open);
   if (!open.empty()) std::cout << "Open File: " <<
