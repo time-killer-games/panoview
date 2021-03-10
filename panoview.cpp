@@ -491,7 +491,7 @@ int main(int argc, char **argv) {
     for (CFIndex i = 0; i < windowCount; i++) {
       CFDictionaryRef windowInfoDictionary = (CFDictionaryRef)CFArrayGetValueAtIndex(windowArray, i);
       CFNumberRef ownerPID = (CFNumberRef)CFDictionaryGetValue(windowInfoDictionary, kCGWindowOwnerPID);
-      pid_t pid; CFNumberGetValue(ownerPID, kCFNumberIntType, &pid);
+      PROCID pid; CFNumberGetValue(ownerPID, kCFNumberIntType, &pid);
       if (getpid() == pid) {
         CFNumberRef windowID = (CFNumberRef)CFDictionaryGetValue(windowInfoDictionary, kCGWindowNumber);
         CGWindowID wid; CFNumberGetValue(windowID, kCGWindowIDCFNumberType, &wid);
