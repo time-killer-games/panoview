@@ -279,6 +279,28 @@ void EnvironFromStdInput(string name, string *value) {
   #endif
 }
 
+void DisplayCursor(bool display) {
+  #if OS_PLATFORM == OS_MACOS
+  if (display) {
+    CGDisplayShowCursor(kCGDirectMainDisplay);
+  } else {
+    CGDisplayHideCursor(kCGDirectMainDisplay);
+  }
+  #else
+  if (dispplay) {
+    glutSetCursor(GLUT_CURSOR_INHERIT);
+  } else {
+    glutSetCursor(GLUT_CURSOR_NONE);
+  }
+  #endif
+}
+
+void DisableWindow(bool disable) {
+  #if OS_PLATFORM == OS_WINDOWS
+  EnableWindow(strtoull(WindowID.c_str(), nullptr, 10), !disable);
+  #endif
+}
+
 void UpdateEnvironmentVariables() {
   string texture; EnvironFromStdInput("PANORAMA_TEXTURE", &texture);
   string pointer; EnvironFromStdInput("PANORAMA_POINTER", &pointer);
@@ -290,18 +312,31 @@ void UpdateEnvironmentVariables() {
   EnvironFromStdInput("PANORAMA_YANGLE", &zdirection);
 
   string okonly; EnvironFromStdInput("MESSAGE_BOX", &okonly);
-  if (!okonly.empty()) std::cout << "Message Box: " <<
-  dialog_module::show_message((char *)okonly.c_str()) << std::endl;
+  if (!okonly.empty()) {
+    DisableWindow(true);
+    DisplayCursor(true); std::cout << "Message Box: " <<
+    dialog_module::show_message((char *)okonly.c_str()) << std::endl;
+    DisplayCursor(false); 
+    DisableWindow(false);
+  }
 
   string open; EnvironFromStdInput("OPEN_FILENAME", &open);
-  if (!open.empty()) std::cout << "Open File: " <<
-  dialog_module::get_open_filename((char *)open.c_str(), 
-  (char *)"") << std::endl;
+  if (!open.empty()) {
+    DisableWindow(true);
+    DisplayCursor(true); std::cout << "Open File: " <<
+    dialog_module::get_open_filename((char *)open.c_str(), 
+    (char *)"") << std::endl; DisplayCursor(false);
+    DisableWindow(false);
+  }
 
   string save; EnvironFromStdInput("SAVE_FILENAME", &save);
-  if (!save.empty()) std::cout << "Save File: " <<
-  dialog_module::get_save_filename((char *)save.c_str(), 
-  (char *)"") << std::endl;
+  if (!save.empty()) {
+    DisableWindow(true);
+    DisplayCursor(true); std::cout << "Save File: " <<
+    dialog_module::get_save_filename((char *)save.c_str(), 
+    (char *)"") << std::endl; DisplayCursor(false);
+    DisableWindow(false);
+  }
 
   if (!texture.empty())
     LoadPanorama(texture.c_str());
