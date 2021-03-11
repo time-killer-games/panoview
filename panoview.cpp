@@ -485,7 +485,7 @@ int main(int argc, char **argv) {
 
   #if OS_PLATFORM != OS_MACOS
   SDL_Init(SDL_INIT_VIDEO);
-  hidden = SDL_CreateWindow("",SDL_WINDOWPOS_CENTERED, 
+  hidden = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, 
   SDL_WINDOWPOS_CENTERED, 0, 0, SDL_WINDOW_BORDERLESS);
   if (hidden != nullptr) { SDL_HideWindow(hidden); }
   #else
