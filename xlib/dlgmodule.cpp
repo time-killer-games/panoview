@@ -108,6 +108,7 @@ unsigned dialog_width  = 0;
 unsigned dialog_height = 0;
 
 void change_relative_to_kwin() {
+  setenv("WAYLAND_DISPLAY", "", 1);
   if (dm_dialogengine == dm_x11) {
     Display *display = XOpenDisplay(nullptr);
     Atom aKWinRunning = XInternAtom(display, "KWIN_RUNNING", true);
