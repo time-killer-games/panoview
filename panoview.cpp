@@ -477,22 +477,6 @@ void mouse(int button, int state, int x, int y) {
   glutPostRedisplay();
 }
 
-#if OS_PLATFORM == OS_WINDOWS
-BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam) {
-  DWORD dwProcessId;
-  GetWindowThreadProcessId(hWnd, &dwProcessId);
-  if (dwProcessId == GetCurrentProcessId()) {
-    wchar_t buffer[256];
-    GetWindowTextW(hWnd, buffer, 256);
-    string caption = narrow(buffer);
-    if (caption == "") {
-      ShowWindow(hWnd, (DWORD)lParam);
-    }
-  }
-  return true;
-}
-#endif
-
 } // anonymous namespace
 
 int main(int argc, char **argv) {
@@ -501,9 +485,8 @@ int main(int argc, char **argv) {
 
   #if OS_PLATFORM != OS_MACOS
   SDL_Init(SDL_INIT_VIDEO);
-  hidden = SDL_CreateWindow("hidden",
-  SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
-  0, 0, SDL_WINDOW_BORDERLESS);
+  hidden = SDL_CreateWindow("",SDL_WINDOWPOS_CENTERED, 
+  SDL_WINDOWPOS_CENTERED, 0, 0, SDL_WINDOW_BORDERLESS);
   if (hidden != nullptr) { SDL_HideWindow(hidden); }
   #else
   setpolicy();
@@ -514,8 +497,9 @@ int main(int argc, char **argv) {
   window = glutCreateWindow("");
 
   #if OS_PLATFORM == OS_WINDOWS
-  EnumWindows(&EnumWindowsProc, SW_HIDE);
-  WindowID = std::to_string((std::uintptr_t)WindowFromDC(wglGetCurrentDC()));
+  HWND handle = WindowFromDC(wglGetCurrentDC());
+  ShowWindow(handle, SW_HIDE);
+  WindowID = std::to_string((std::uintptr_t)handle);
   std::cout << "Window ID: " << WindowID << std::endl;
   #elif OS_PLATFORM == OS_MACOS
   CFArrayRef windowArray = CGWindowListCopyWindowInfo(
@@ -629,7 +613,7 @@ int main(int argc, char **argv) {
   glutShowWindow();
   glutFullScreen();
   #if OS_PLATFORM == OS_WINDOWS
-  EnumWindows(&EnumWindowsProc, SW_SHOW);
+  ShowWindow(handle, SW_SHOW);
   #endif
 
   DisplayCursor(false);
