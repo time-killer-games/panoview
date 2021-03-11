@@ -45,6 +45,9 @@
 #if OS_PLATFORM == OS_WINDOWS
 #include "Win32/libpng-util.h"
 #elif OS_UNIXLIKE == true
+#if OS_PLATFORM == OS_MACOS
+#include "macOS/setpolicy.h"
+#endif
 #include "Unix/lodepng.h"
 #endif
 
@@ -502,6 +505,8 @@ int main(int argc, char **argv) {
   SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
   0, 0, SDL_WINDOW_BORDERLESS);
   if (hidden != nullptr) { SDL_HideWindow(hidden); }
+  #else
+  setpolicy();
   #endif
 
   glutInitWindowPosition(0, 0);

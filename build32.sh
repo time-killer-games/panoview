@@ -2,7 +2,7 @@
 cd "${0%/*}"
 
 if [ $(uname) = "Darwin" ]; then
-  clang++ panoview.cpp Unix/lodepng.cpp macOS/dlgmodule.mm macOS/config.cpp -o panoview -std=c++17 -ObjC++ -framework OpenGL -framework GLUT -DGL_SILENCE_DEPRECATION -framework Cocoa -m32
+  clang++ panoview.cpp Unix/lodepng.cpp macOS/setpolicy.mm macOS/dlgmodule.mm macOS/config.cpp -o panoview -std=c++17 -ObjC++ -framework OpenGL -framework GLUT -DGL_SILENCE_DEPRECATION -framework Cocoa -m32
 elif [ $(uname) = "Linux" ]; then
   g++ panoview.cpp Unix/lodepng.cpp xlib/dlgmodule.cpp -o panoview -std=c++17 -static-libgcc -static-libstdc++ -lSDL2 -lGL -lGLU -lglut -lm -lpthread -lX11 -lprocps -m32
 elif [ $(uname) = "FreeBSD" ]; then
