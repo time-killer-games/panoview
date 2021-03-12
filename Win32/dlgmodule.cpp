@@ -292,7 +292,7 @@ namespace dialog_module {
           int ypos = wrect.top - (height / 2);
           MoveWindow(dlg, xpos, ypos, width, height, true);
           if (hidden == true)
-            SendDlgItemMessageW(dlg, 1000, EM_SETPASSWORDCHAR, L'●', 0);
+            SendDlgItemMessageW(dlg, 1000, EM_SETPASSWORDCHAR, L'\x25cf', 0);
           init = false;
         }
         wstring cpp_wstr_icon = widen(tstr_icon);
