@@ -37,8 +37,8 @@
 #include <algorithm>
 
 #include "../Universal/dlgmodule.h"
+#include "../Universal/xproc.h"
 #include "../Unix/lodepng.h"
-#include "xproc.h"
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
