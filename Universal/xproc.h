@@ -733,7 +733,7 @@ inline void ParentProcIdFromProcIdSkipSh(PROCID procId, PROCID *parentProcId) {
   #endif
 }
 
-inline void ProcIdFromParentProcIdSkipSh(pid_t parentProcId, pid_t **procId, int *size) {
+inline void ProcIdFromParentProcIdSkipSh(PROCID parentProcId, PROCID **procId, int *size) {
   ProcIdFromParentProcId(parentProcId, procId, size);
   #if OS_UNIXLIKE == true
   if (procId) {
