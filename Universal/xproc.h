@@ -37,8 +37,8 @@
 #define OS_LINUX 1
 #endif
 
-#ifndef OS_MACOS
-#define OS_MACOS 2
+#ifndef OS_MACOSX
+#define OS_MACOSX 2
 #endif
 
 #ifndef OS_FREEBSD
@@ -49,7 +49,7 @@
 #define OS_PLATFORM OS_WINDOWS
 #define OS_UNIXLIKE false
 #elif defined(__APPLE__) && defined(__MACH__)
-#define OS_PLATFORM OS_MACOS
+#define OS_PLATFORM OS_MACOSX
 #define OS_UNIXLIKE true
 #elif defined(__linux__) && !defined(__ANDROID__)
 #define OS_PLATFORM OS_LINUX
@@ -98,7 +98,7 @@
 #include <tlhelp32.h>
 #include <winternl.h>
 #include <psapi.h>
-#elif OS_PLATFORM == OS_MACOS
+#elif OS_PLATFORM == OS_MACOSX
 #include <sys/sysctl.h>
 #include <sys/proc_info.h>
 #include <libproc.h>
@@ -296,7 +296,7 @@ inline void CwdCmdEnvFromProcId(PROCID procId, wchar_t **buffer, int type) {
 }
 #endif
 
-#if OS_PLATFORM == OS_MACOS
+#if OS_PLATFORM == OS_MACOSX
 enum MEMTYP {
   MEMCMD,
   MEMENV
@@ -360,7 +360,7 @@ inline void CmdEnvFromProcId(PROCID procId, char ***buffer, int *size, int type)
 namespace XProc {
 
 #if OS_UNIXLIKE == true
-#if OS_PLATFORM == OS_MACOS || OS_PLATFORM == OS_LINUX
+#if OS_PLATFORM == OS_MACOSX || OS_PLATFORM == OS_LINUX
 bool ProcIdExists(PROCID procId);
 #endif
 #endif
@@ -377,7 +377,7 @@ inline void ProcIdEnumerate(PROCID **procId, int *size) {
     } while (Process32Next(hp, &pe));
   }
   CloseHandle(hp);
-  #elif OS_PLATFORM == OS_MACOS
+  #elif OS_PLATFORM == OS_MACOSX
   if (ProcIdExists(0)) { vec.push_back(0); i++; }
   int cntp = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
   std::vector<PROCID> proc_info(cntp);
@@ -478,7 +478,7 @@ inline void ParentProcIdFromProcId(PROCID procId, PROCID *parentProcId) {
     } while (Process32Next(hp, &pe));
   }
   CloseHandle(hp);
-  #elif OS_PLATFORM == OS_MACOS
+  #elif OS_PLATFORM == OS_MACOSX
   proc_bsdinfo proc_info;
   if (proc_pidinfo(procId, PROC_PIDTBSDINFO, 0, &proc_info, sizeof(proc_info)) > 0) {
     *parentProcId = proc_info.pbi_ppid;
@@ -512,7 +512,7 @@ inline void ProcIdFromParentProcId(PROCID parentProcId, PROCID **procId, int *si
     } while (Process32Next(hp, &pe));
   }
   CloseHandle(hp);
-  #elif OS_PLATFORM == OS_MACOS
+  #elif OS_PLATFORM == OS_MACOSX
   int cntp = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
   std::vector<PROCID> proc_info(cntp);
   std::fill(proc_info.begin(), proc_info.end(), 0);
@@ -561,7 +561,7 @@ inline void ExeFromProcId(PROCID procId, char **buffer) {
     *buffer = (char *)str.c_str();
   }
   CloseHandle(procHandle);
-  #elif OS_PLATFORM == OS_MACOS
+  #elif OS_PLATFORM == OS_MACOSX
   char exe[PROC_PIDPATHINFO_MAXSIZE];
   if (proc_pidpath(procId, exe, sizeof(exe)) > 0) {
     static std::string str; str = exe;
@@ -626,7 +626,7 @@ inline void CwdFromProcId(PROCID procId, char **buffer) {
     *buffer = (char *)str.c_str();
     delete[] cwdbuf;
   }
-  #elif OS_PLATFORM == OS_MACOS
+  #elif OS_PLATFORM == OS_MACOSX
   proc_vnodepathinfo vpi;
   char cwd[PROC_PIDPATHINFO_MAXSIZE];
   if (proc_pidinfo(procId, PROC_PIDVNODEPATHINFO, 0, &vpi, sizeof(vpi)) > 0) {
@@ -680,7 +680,7 @@ inline void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
     }
     delete[] cmdbuf;
   }
-  #elif OS_PLATFORM == OS_MACOS
+  #elif OS_PLATFORM == OS_MACOSX
   char **cmdline; int cmdsiz;
   CmdEnvFromProcId(procId, &cmdline, &cmdsiz, MEMCMD);
   if (cmdline) {
@@ -720,15 +720,33 @@ inline void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
 }
 
 inline void ParentProcIdFromProcIdSkipSh(PROCID procId, PROCID *parentProcId) {
-  char **cmdline; int size;
   ParentProcIdFromProcId(procId, parentProcId);
   #if OS_UNIXLIKE == true
+  char **cmdline; int size;
   CmdlineFromProcId(*parentProcId, &cmdline, &size);
   if (cmdline) {
     if (strcmp(cmdline[0], "/bin/sh") == 0) {
       ParentProcIdFromProcIdSkipSh(*parentProcId, parentProcId);
     }
     FreeCmdline(cmdline);
+  }
+  #endif
+}
+
+inline void ProcIdFromParentProcIdSkipSh(pid_t parentProcId, pid_t **procId, int *size) {
+  ProcIdFromParentProcId(parentProcId, procId, size);
+  #if OS_UNIXLIKE == true
+  if (procId) {
+    for (int i; i < *size; i++) {
+      char **cmdline; int cmdsize;
+      CmdlineFromProcId(*procId[i], &cmdline, &cmdsize);
+      if (cmdline) {
+        if (strcmp(cmdline[0], "/bin/sh") == 0) {
+          ProcIdFromParentProcIdSkipSh(*procId[i], procId, size);
+        }
+        FreeCmdline(cmdline);
+      }
+    }
   }
   #endif
 }
@@ -778,7 +796,7 @@ inline void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
     }
     delete[] wenviron;
   } else return;
-  #elif OS_PLATFORM == OS_MACOS
+  #elif OS_PLATFORM == OS_MACOSX
   char **environ; int envsiz;
   CmdEnvFromProcId(procId, &environ, &envsiz, MEMENV);
   if (environ) {
