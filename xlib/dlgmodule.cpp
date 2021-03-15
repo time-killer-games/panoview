@@ -38,6 +38,7 @@
 
 #include "../Universal/dlgmodule.h"
 #include "../Unix/lodepng.h"
+#include "xproc.h"
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -289,42 +290,45 @@ pid_t process_execute(const char *command, int *infp, int *outfp) {
   return pid;
 }
 
-void modify_dialog(Display *display, pid_t pid) {
+static void *modify_dialog(void *pid) {
   SetErrorHandlers();
+  Display *display = XOpenDisplay(nullptr);
   Window wid = wid_from_top(display),
     pwid = owner ? (Window)owner : wid;
-  while (pid_from_wid(display, wid) != pid) {
+  while (pid_from_wid(display, wid) != (pid_t)(std::intptr_t)pid) {
     wid = wid_from_top(display);
   }
-  if (owner != (void *)-1)
-    XSetTransientForHint(display, wid, pwid);
+  XSetTransientForHint(display, wid, (Window)pwid);
+  int len = caption.length() + 1; char *buffer = new char[len]();
+  strcpy(buffer, caption.c_str()); XChangeProperty(display, wid,
+  XInternAtom(display, "_NET_WM_NAME", false),
+  XInternAtom(display, "UTF8_STRING", false),
+  8, PropModeReplace, (unsigned char *)buffer, len); delete[] buffer;
   if (file_exists(current_icon) && filename_ext(current_icon) == ".png")
     XSetIcon(display, wid, current_icon.c_str());
+  XCloseDisplay(display);
+  return nullptr;
 }
 
 string create_shell_dialog(string command) {
   string output; char buffer[BUFSIZ];
   int outfp = 0, infp = 0; ssize_t nRead = 0;
   pid_t pid = process_execute(command.c_str(), &infp, &outfp);
-  pid_t fpid = 0; if ((fpid = fork()) == 0) {
-    SetErrorHandlers();
-    Display *display = XOpenDisplay(nullptr);
-    modify_dialog(display, pid);
-    XCloseDisplay(display);
-    exit(0);
+  std::this_thread::sleep_for (std::chrono::milliseconds(100)); pthread_t thread;
+  pid_t *pids; int size; XProc::ProcIdFromParentProcIdSkipSh(pid, &pids, &size);
+  if (pids) {
+    pthread_create(&thread, nullptr,
+    modify_dialog, (void *)(std::intptr_t)pids[0]);
+    free(pids);
+  } else {
+    pthread_create(&thread, nullptr,
+    modify_dialog, (void *)(std::intptr_t)pid);
   }
   while ((nRead = read(outfp, buffer, BUFSIZ)) > 0) {
     buffer[nRead] = '\0';
     output.append(buffer, nRead);
   }
-  kill(fpid, SIGTERM);
-  bool died = false;
-  for (unsigned i = 0; !died && i < 4; i++) {
-    int status;
-    std::this_thread::sleep_for(std::chrono::milliseconds(250));
-    if (waitpid(fpid, &status, WNOHANG) == fpid) died = true;
-  }
-  if (!died) kill(fpid, SIGKILL);
+  pthread_cancel(thread);
   while (output.back() == '\r' || output.back() == '\n')
     output.pop_back();
   return output;
