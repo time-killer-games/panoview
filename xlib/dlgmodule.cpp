@@ -295,11 +295,11 @@ void modify_dialog(Display *display, pid_t pid) {
     pwid = owner ? (Window)owner : wid;
   while (pid_from_wid(display, wid) != pid) {
     wid = wid_from_top(display);
-    if (owner != (void *)-1)
-      XSetTransientForHint(display, wid, pwid);
-    if (file_exists(current_icon) && filename_ext(current_icon) == ".png")
-      XSetIcon(display, wid, current_icon.c_str());
   }
+  if (owner != (void *)-1)
+    XSetTransientForHint(display, wid, pwid);
+  if (file_exists(current_icon) && filename_ext(current_icon) == ".png")
+    XSetIcon(display, wid, current_icon.c_str());
 }
 
 string create_shell_dialog(string command) {
