@@ -45,7 +45,7 @@
 #if OS_PLATFORM == OS_WINDOWS
 #include "Win32/libpng-util.h"
 #elif OS_UNIXLIKE == true
-#if OS_PLATFORM == OS_MACOS
+#if OS_PLATFORM == OS_MACOSX
 #include "macOS/setpolicy.h"
 #endif
 #include "Unix/lodepng.h"
@@ -59,7 +59,7 @@
 #include <fcntl.h>
 #endif
 
-#if OS_PLATFORM == OS_MACOS
+#if OS_PLATFORM == OS_MACOSX
 #include <libproc.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -224,7 +224,7 @@ void DrawCursor(GLuint texid, int curx, int cury, int curwidth, int curheight) {
   glEnd(); glDisable(GL_TEXTURE_2D);
 }
 
-#if OS_PLATFORM != OS_MACOS
+#if OS_PLATFORM != OS_MACOSX
 SDL_Window *hidden = nullptr;
 #endif
 
@@ -283,7 +283,7 @@ void EnvironFromStdInput(string name, string *value) {
 }
 
 void DisplayCursor(bool display) {
-  #if OS_PLATFORM == OS_MACOS
+  #if OS_PLATFORM == OS_MACOSX
   if (display) {
     CGDisplayShowCursor(kCGDirectMainDisplay);
   } else {
@@ -346,7 +346,7 @@ void display() {
   glBindTexture(GL_TEXTURE_2D, tex);
   DrawPanorama(); glFlush();
 
-  #if OS_PLATFORM != OS_MACOS
+  #if OS_PLATFORM != OS_MACOSX
   SDL_Rect rect; if (hidden == nullptr) { return; }
   int dpy = SDL_GetWindowDisplayIndex(hidden);
   int err = SDL_GetDisplayBounds(dpy, &rect); 
@@ -410,7 +410,7 @@ void PanoramaSetVertAngle(double vangle) {
 }
 
 void WarpMouse() {
-  #if OS_PLATFORM != OS_MACOS
+  #if OS_PLATFORM != OS_MACOSX
   int mx, my; SDL_Rect rect;
   SDL_GetGlobalMouseState(&mx, &my);
   if (hidden == nullptr) { return; }
@@ -483,7 +483,7 @@ int main(int argc, char **argv) {
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE);
 
-  #if OS_PLATFORM != OS_MACOS
+  #if OS_PLATFORM != OS_MACOSX
   SDL_Init(SDL_INIT_VIDEO);
   hidden = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, 
   SDL_WINDOWPOS_CENTERED, 0, 0, SDL_WINDOW_BORDERLESS);
@@ -501,7 +501,7 @@ int main(int argc, char **argv) {
   ShowWindow(handle, SW_HIDE);
   WindowID = std::to_string((std::uintptr_t)handle);
   std::cout << "Window ID: " << WindowID << std::endl;
-  #elif OS_PLATFORM == OS_MACOS
+  #elif OS_PLATFORM == OS_MACOSX
   CFArrayRef windowArray = CGWindowListCopyWindowInfo(
   kCGWindowListOptionAll, kCGNullWindowID);
   CFIndex windowCount = 0;
@@ -539,7 +539,7 @@ int main(int argc, char **argv) {
   if (GetModuleFileNameW(nullptr, exe, MAX_PATH)) {
     exefile = narrow(exe);
   }
-  #elif OS_PLATFORM == OS_MACOS
+  #elif OS_PLATFORM == OS_MACOSX
   char exe[PROC_PIDPATHINFO_MAXSIZE];
   if (proc_pidpath(getpid(), exe, sizeof(exe)) > 0) {
     exefile = exe;
