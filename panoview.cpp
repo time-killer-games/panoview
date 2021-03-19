@@ -42,16 +42,16 @@
 
 #include "Universal/xproc.h"
 #include "Universal/dlgmodule.h"
-#if OS_PLATFORM == OS_WINDOWS
+#if defined(_WIN32)
 #include "Win32/libpng-util.h"
-#elif OS_UNIXLIKE == true
-#if OS_PLATFORM == OS_MACOSX
-#include "macOS/setpolicy.h"
+#elif !defined(_WIN32)
+#if (defined(__APPLE__) && defined(__MACH__))
+#include "MacOSX/setpolicy.h"
 #endif
 #include "Unix/lodepng.h"
 #endif
 
-#if OS_UNIXLIKE == true
+#if !defined(_WIN32)
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
@@ -59,17 +59,17 @@
 #include <fcntl.h>
 #endif
 
-#if OS_PLATFORM == OS_MACOSX
+#if (defined(__APPLE__) && defined(__MACH__))
 #include <libproc.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <GLUT/glut.h>
 #else
-#if OS_PLATFORM == OS_WINDOWS
+#if defined(_WIN32)
 #include <windows.h>
-#elif OS_PLATFORM == OS_LINUX
+#elif (defined(__linux__) && !defined(__ANDROID__))
 #include <GL/glx.h>
-#elif OS_PLATFORM == OS_FREEBSD
+#elif defined(__FreeBSD__)
 #include <sys/sysctl.h>
 #include <GL/glx.h>
 #endif
@@ -77,7 +77,7 @@
 #include <SDL2/SDL.h>
 #endif
 
-#if OS_PLATFORM == OS_WINDOWS
+#if defined(_WIN32)
 #define GL_CLAMP_TO_EDGE 0x812F
 #endif
 
@@ -91,7 +91,7 @@ using std::wstring;
 using std::vector;
 using std::size_t;
 
-#if OS_UNIXLIKE == true
+#if !defined(_WIN32)
 typedef pid_t PROCID;
 #else
 typedef DWORD PROCID;
@@ -107,7 +107,7 @@ const double PI = 3.141592653589793;
 void LoadImage(unsigned char **out, unsigned *pngwidth, unsigned *pngheight, 
   const char *fname) {
   unsigned char *data = nullptr;
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   wstring u8fname = widen(fname); 
   unsigned error = libpng_decode32_file(&data, pngwidth, pngheight, u8fname.c_str());
   #else
@@ -224,7 +224,7 @@ void DrawCursor(GLuint texid, int curx, int cury, int curwidth, int curheight) {
   glEnd(); glDisable(GL_TEXTURE_2D);
 }
 
-#if OS_PLATFORM != OS_MACOSX
+#if !(defined(__APPLE__) && defined(__MACH__))
 SDL_Window *hidden = nullptr;
 #endif
 
@@ -238,7 +238,7 @@ vector<string> StringSplit(string str, string delim) {
 }
 
 void EnvironFromStdInput(string name, string *value) {
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   DWORD bytesAvail = 0;
   HANDLE hPipe = GetStdHandle(STD_INPUT_HANDLE);
   FlushFileBuffers(hPipe);
@@ -283,7 +283,7 @@ void EnvironFromStdInput(string name, string *value) {
 }
 
 void DisplayCursor(bool display) {
-  #if OS_PLATFORM == OS_MACOSX
+  #if (defined(__APPLE__) && defined(__MACH__))
   if (display) {
     CGDisplayShowCursor(kCGDirectMainDisplay);
   } else {
@@ -346,7 +346,7 @@ void display() {
   glBindTexture(GL_TEXTURE_2D, tex);
   DrawPanorama(); glFlush();
 
-  #if OS_PLATFORM != OS_MACOSX
+  #if !(defined(__APPLE__) && defined(__MACH__))
   SDL_Rect rect; if (hidden == nullptr) { return; }
   int dpy = SDL_GetWindowDisplayIndex(hidden);
   int err = SDL_GetDisplayBounds(dpy, &rect); 
@@ -410,7 +410,7 @@ void PanoramaSetVertAngle(double vangle) {
 }
 
 void WarpMouse() {
-  #if OS_PLATFORM != OS_MACOSX
+  #if !(defined(__APPLE__) && defined(__MACH__))
   int mx, my; SDL_Rect rect;
   SDL_GetGlobalMouseState(&mx, &my);
   if (hidden == nullptr) { return; }
@@ -483,7 +483,7 @@ int main(int argc, char **argv) {
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE);
 
-  #if OS_PLATFORM != OS_MACOSX
+  #if !(defined(__APPLE__) && defined(__MACH__))
   SDL_Init(SDL_INIT_VIDEO);
   hidden = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, 
   SDL_WINDOWPOS_CENTERED, 0, 0, SDL_WINDOW_BORDERLESS);
@@ -496,12 +496,12 @@ int main(int argc, char **argv) {
   glutInitWindowSize(1, 1);
   window = glutCreateWindow("");
 
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   HWND handle = WindowFromDC(wglGetCurrentDC());
   ShowWindow(handle, SW_HIDE);
   WindowID = std::to_string((std::uintptr_t)handle);
   std::cout << "Window ID: " << WindowID << std::endl;
-  #elif OS_PLATFORM == OS_MACOSX
+  #elif (defined(__APPLE__) && defined(__MACH__))
   CFArrayRef windowArray = CGWindowListCopyWindowInfo(
   kCGWindowListOptionAll, kCGNullWindowID);
   CFIndex windowCount = 0;
@@ -524,7 +524,7 @@ int main(int argc, char **argv) {
     }
   }
   CFRelease(windowArray);
-  #elif OS_PLATFORM == OS_LINUX || OS_PLATFORM == OS_FREEBSD
+  #elif (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__)
   WindowID = std::to_string((std::uintptr_t)glXGetCurrentDrawable());
   std::cout << "Window ID: " << WindowID << std::endl;
   #endif
@@ -534,22 +534,22 @@ int main(int argc, char **argv) {
   glClearColor(0, 0, 0, 1);
 
   string exefile;
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   wchar_t exe[MAX_PATH];
   if (GetModuleFileNameW(nullptr, exe, MAX_PATH)) {
     exefile = narrow(exe);
   }
-  #elif OS_PLATFORM == OS_MACOSX
+  #elif (defined(__APPLE__) && defined(__MACH__))
   char exe[PROC_PIDPATHINFO_MAXSIZE];
   if (proc_pidpath(getpid(), exe, sizeof(exe)) > 0) {
     exefile = exe;
   }
-  #elif OS_PLATFORM == OS_LINUX
+  #elif (defined(__linux__) && !defined(__ANDROID__))
   char exe[PATH_MAX]; 
   if (realpath("/proc/self/exe", exe)) {
     exefile = exe;
   }
-  #elif OS_PLATFORM == OS_FREEBSD
+  #elif defined(__FreeBSD__)
   int mib[4]; size_t s;
   mib[0] = CTL_KERN;
   mib[1] = KERN_PROC;
@@ -568,7 +568,7 @@ int main(int argc, char **argv) {
   cwd = exefile.substr(0, exefile.find_last_of("/\\"));
 
   string panorama; if (argc == 1) {
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   dialog_module::widget_set_owner((char *)std::to_string(
   (std::uintptr_t)GetDesktopWindow()).c_str());
   #else
@@ -612,7 +612,7 @@ int main(int argc, char **argv) {
   
   glutShowWindow();
   glutFullScreen();
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   ShowWindow(handle, SW_SHOW);
   #endif
 

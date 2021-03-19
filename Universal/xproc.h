@@ -25,45 +25,6 @@
  
 */
 
-#ifndef OS_UNKNOWN
-#define OS_UNKNOWN -1
-#endif
-
-#ifndef OS_WINDOWS
-#define OS_WINDOWS 0
-#endif
-
-#ifndef OS_LINUX
-#define OS_LINUX 1
-#endif
-
-#ifndef OS_MACOSX
-#define OS_MACOSX 2
-#endif
-
-#ifndef OS_FREEBSD
-#define OS_FREEBSD 3
-#endif
-
-#if defined(_WIN32)
-#define OS_PLATFORM OS_WINDOWS
-#define OS_UNIXLIKE false
-#elif defined(__APPLE__) && defined(__MACH__)
-#define OS_PLATFORM OS_MACOSX
-#define OS_UNIXLIKE true
-#elif defined(__linux__) && !defined(__ANDROID__)
-#define OS_PLATFORM OS_LINUX
-#define OS_UNIXLIKE true
-#elif defined(__FreeBSD__)
-#define OS_PLATFORM OS_FREEBSD
-#define OS_UNIXLIKE true
-#endif
-
-#if !defined(OS_PLATFORM)
-#define OS_PLATFORM OS_UNKNOWN
-#define OS_UNIXLIKE false
-#endif
-
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -76,35 +37,25 @@
 #include <climits>
 #include <cstdio>
 
-#define OS_32BIT 32
-#define OS_64BIT 64
-#if UINTPTR_MAX == 0xffffffff
-#define OS_ARCHITECTURE OS_32BIT
-#elif UINTPTR_MAX == 0xffffffffffffffff
-#define OS_ARCHITECTURE OS_64BIT
-#else
-#error Unexpected value for UINTPTR_MAX; OS_ARCHITECTURE, as a result, is undefined!
-#endif
-
-#if OS_UNIXLIKE == true
+#if !defined(_WIN32)
 #include <sys/types.h>
 #include <signal.h>
 #include <unistd.h>
 #endif
 
-#if OS_PLATFORM == OS_WINDOWS
+#if defined(_WIN32)
 #include <windows.h>
 #include <Objbase.h>
 #include <tlhelp32.h>
 #include <winternl.h>
 #include <psapi.h>
-#elif OS_PLATFORM == OS_MACOSX
+#elif (defined(__APPLE__) && defined(__MACH__))
 #include <sys/sysctl.h>
 #include <sys/proc_info.h>
 #include <libproc.h>
-#elif OS_PLATFORM == OS_LINUX
+#elif (defined(__linux__) && !defined(__ANDROID__))
 #include <proc/readproc.h>
-#elif OS_PLATFORM == OS_FREEBSD
+#elif defined(__FreeBSD__)
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/param.h>
@@ -114,7 +65,7 @@
 #include <libutil.h>
 #endif
 
-#if OS_UNIXLIKE == true
+#if !defined(_WIN32)
 typedef pid_t PROCID;
 #else
 typedef DWORD PROCID;
@@ -141,7 +92,7 @@ inline std::vector<std::string> StringSplitByFirstEqualsSign(std::string str) {
   return vec;
 }
 
-#if OS_PLATFORM == OS_WINDOWS
+#if defined(_WIN32)
 enum MEMTYP {
   MEMCMD,
   MEMENV,
@@ -296,7 +247,7 @@ inline void CwdCmdEnvFromProcId(PROCID procId, wchar_t **buffer, int type) {
 }
 #endif
 
-#if OS_PLATFORM == OS_MACOSX
+#if (defined(__APPLE__) && defined(__MACH__))
 enum MEMTYP {
   MEMCMD,
   MEMENV
@@ -359,15 +310,15 @@ inline void CmdEnvFromProcId(PROCID procId, char ***buffer, int *size, int type)
 
 namespace XProc {
 
-#if OS_UNIXLIKE == true
-#if OS_PLATFORM == OS_MACOSX || OS_PLATFORM == OS_LINUX
+#if !defined(_WIN32)
+#if (defined(__APPLE__) && defined(__MACH__)) || (defined(__linux__) && !defined(__ANDROID__))
 bool ProcIdExists(PROCID procId);
 #endif
 #endif
 
 inline void ProcIdEnumerate(PROCID **procId, int *size) {
   std::vector<PROCID> vec; int i = 0;
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   HANDLE hp = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
   PROCESSENTRY32 pe = { 0 };
   pe.dwSize = sizeof(PROCESSENTRY32);
@@ -377,7 +328,7 @@ inline void ProcIdEnumerate(PROCID **procId, int *size) {
     } while (Process32Next(hp, &pe));
   }
   CloseHandle(hp);
-  #elif OS_PLATFORM == OS_MACOSX
+  #elif (defined(__APPLE__) && defined(__MACH__))
   if (ProcIdExists(0)) { vec.push_back(0); i++; }
   int cntp = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
   std::vector<PROCID> proc_info(cntp);
@@ -387,7 +338,7 @@ inline void ProcIdEnumerate(PROCID **procId, int *size) {
     if (proc_info[j] == 0) { continue; }
     vec.push_back(proc_info[j]); i++;
   }
-  #elif OS_PLATFORM == OS_LINUX
+  #elif (defined(__linux__) && !defined(__ANDROID__))
   if (ProcIdExists(0)) { vec.push_back(0); i++; }
   PROCTAB *proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLSTATUS);
   while (proc_t *proc_info = readproc(proc, nullptr)) {
@@ -395,7 +346,7 @@ inline void ProcIdEnumerate(PROCID **procId, int *size) {
     freeproc(proc_info);
   }
   closeproc(proc);
-  #elif OS_PLATFORM == OS_FREEBSD
+  #elif defined(__FreeBSD__)
   int cntp; if (kinfo_proc *proc_info = kinfo_getallproc(&cntp)) {
     for (int j = 0; j < cntp; j++) {
       vec.push_back(proc_info[j].ki_pid); i++;
@@ -411,29 +362,29 @@ inline void ProcIdEnumerate(PROCID **procId, int *size) {
 }
 
 inline void ProcIdFromSelf(PROCID *procId) {
-  #if OS_UNIXLIKE == true
+  #if !defined(_WIN32)
   *procId = getpid();
-  #elif OS_PLATFORM == OS_WINDOWS
+  #elif defined(_WIN32)
   *procId = GetCurrentProcessId();
   #endif
 }
 
-#if OS_PLATFORM == OS_WINDOWS
+#if defined(_WIN32)
 void ParentProcIdFromProcId(PROCID procId, PROCID *parentProcId);
 #endif
 
 inline void ParentProcIdFromSelf(PROCID *parentProcId) {
-  #if OS_UNIXLIKE == true
+  #if !defined(_WIN32)
   *parentProcId = getppid();
-  #elif OS_PLATFORM == OS_WINDOWS
+  #elif defined(_WIN32)
   ParentProcIdFromProcId(GetCurrentProcessId(), parentProcId);
   #endif
 }
 
 inline bool ProcIdExists(PROCID procId) {
-  #if OS_UNIXLIKE == true
+  #if !defined(_WIN32)
   return (kill(procId, 0) == 0);
-  #elif OS_PLATFORM == OS_WINDOWS
+  #elif defined(_WIN32)
   PROCID *buffer; int size;
   XProc::ProcIdEnumerate(&buffer, &size);
   if (procId) {
@@ -451,9 +402,9 @@ inline bool ProcIdExists(PROCID procId) {
 }
 
 inline bool ProcIdKill(PROCID procId) {
-  #if OS_UNIXLIKE == true
+  #if !defined(_WIN32)
   return (kill(procId, SIGKILL) == 0);
-  #elif OS_PLATFORM == OS_WINDOWS
+  #elif defined(_WIN32)
   HANDLE procHandle = OpenProcessWithDebugPrivilege(procId);
   if (procHandle == nullptr) return false;
   bool result = TerminateProcess(procHandle, 0);
@@ -465,7 +416,7 @@ inline bool ProcIdKill(PROCID procId) {
 }
 
 inline void ParentProcIdFromProcId(PROCID procId, PROCID *parentProcId) {
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   HANDLE hp = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
   PROCESSENTRY32 pe = { 0 };
   pe.dwSize = sizeof(PROCESSENTRY32);
@@ -478,19 +429,19 @@ inline void ParentProcIdFromProcId(PROCID procId, PROCID *parentProcId) {
     } while (Process32Next(hp, &pe));
   }
   CloseHandle(hp);
-  #elif OS_PLATFORM == OS_MACOSX
+  #elif (defined(__APPLE__) && defined(__MACH__))
   proc_bsdinfo proc_info;
   if (proc_pidinfo(procId, PROC_PIDTBSDINFO, 0, &proc_info, sizeof(proc_info)) > 0) {
     *parentProcId = proc_info.pbi_ppid;
   }
-  #elif OS_PLATFORM == OS_LINUX
+  #elif (defined(__linux__) && !defined(__ANDROID__))
   PROCTAB *proc = openproc(PROC_FILLSTATUS | PROC_PID, &procId);
   if (proc_t *proc_info = readproc(proc, nullptr)) { 
     *parentProcId = proc_info->ppid;
     freeproc(proc_info);
   }
   closeproc(proc);
-  #elif OS_PLATFORM == OS_FREEBSD
+  #elif defined(__FreeBSD__)
   if (kinfo_proc *proc_info = kinfo_getproc(procId)) {
     *parentProcId = proc_info->ki_ppid;
     free(proc_info);
@@ -500,7 +451,7 @@ inline void ParentProcIdFromProcId(PROCID procId, PROCID *parentProcId) {
 
 inline void ProcIdFromParentProcId(PROCID parentProcId, PROCID **procId, int *size) {
   std::vector<PROCID> vec; int i = 0;
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   HANDLE hp = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
   PROCESSENTRY32 pe = { 0 };
   pe.dwSize = sizeof(PROCESSENTRY32);
@@ -512,7 +463,7 @@ inline void ProcIdFromParentProcId(PROCID parentProcId, PROCID **procId, int *si
     } while (Process32Next(hp, &pe));
   }
   CloseHandle(hp);
-  #elif OS_PLATFORM == OS_MACOSX
+  #elif (defined(__APPLE__) && defined(__MACH__))
   int cntp = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
   std::vector<PROCID> proc_info(cntp);
   std::fill(proc_info.begin(), proc_info.end(), 0);
@@ -524,7 +475,7 @@ inline void ProcIdFromParentProcId(PROCID parentProcId, PROCID **procId, int *si
       vec.push_back(proc_info[j]); i++;
     }
   }
-  #elif OS_PLATFORM == OS_LINUX
+  #elif (defined(__linux__) && !defined(__ANDROID__))
   PROCTAB *proc = openproc(PROC_FILLSTAT);
   while (proc_t *proc_info = readproc(proc, nullptr)) {
     if (proc_info->ppid == parentProcId) {
@@ -533,7 +484,7 @@ inline void ProcIdFromParentProcId(PROCID parentProcId, PROCID **procId, int *si
     freeproc(proc_info);
   }
   closeproc(proc);
-  #elif OS_PLATFORM == OS_FREEBSD
+  #elif defined(__FreeBSD__)
   int cntp; if (kinfo_proc *proc_info = kinfo_getallproc(&cntp)) {
     for (int j = 0; j < cntp; j++) {
       if (proc_info[j].ki_ppid == parentProcId) {
@@ -552,7 +503,7 @@ inline void ProcIdFromParentProcId(PROCID parentProcId, PROCID **procId, int *si
 
 inline void ExeFromProcId(PROCID procId, char **buffer) {
   if (!ProcIdExists(procId)) return;
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   HANDLE procHandle = OpenProcessWithDebugPrivilege(procId);
   if (procHandle == nullptr) return;
   wchar_t exe[MAX_PATH]; DWORD size = MAX_PATH;
@@ -561,20 +512,20 @@ inline void ExeFromProcId(PROCID procId, char **buffer) {
     *buffer = (char *)str.c_str();
   }
   CloseHandle(procHandle);
-  #elif OS_PLATFORM == OS_MACOSX
+  #elif (defined(__APPLE__) && defined(__MACH__))
   char exe[PROC_PIDPATHINFO_MAXSIZE];
   if (proc_pidpath(procId, exe, sizeof(exe)) > 0) {
     static std::string str; str = exe;
     *buffer = (char *)str.c_str();
   }
-  #elif OS_PLATFORM == OS_LINUX
+  #elif (defined(__linux__) && !defined(__ANDROID__))
   char exe[PATH_MAX]; 
   std::string symLink = "/proc/" + std::to_string(procId) + "/exe";
   if (realpath(symLink.c_str(), exe)) {
     static std::string str; str = exe;
     *buffer = (char *)str.c_str();
   }
-  #elif OS_PLATFORM == OS_FREEBSD
+  #elif defined(__FreeBSD__)
   int mib[4]; std::size_t s;
   mib[0] = CTL_KERN;
   mib[1] = KERN_PROC;
@@ -593,7 +544,7 @@ inline void ExeFromProcId(PROCID procId, char **buffer) {
 
 inline const char *DirectoryGetCurrentWorking() {
   static std::string str;
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   wchar_t u8dname[MAX_PATH];
   if (GetCurrentDirectoryW(MAX_PATH, u8dname) != 0) {
     str = narrow(u8dname);
@@ -608,7 +559,7 @@ inline const char *DirectoryGetCurrentWorking() {
 }
 
 inline bool DirectorySetCurrentWorking(const char *dname) {
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   std::wstring u8dname = widen(dname);
   return SetCurrentDirectoryW(u8dname.c_str());
   #else
@@ -618,7 +569,7 @@ inline bool DirectorySetCurrentWorking(const char *dname) {
 
 inline void CwdFromProcId(PROCID procId, char **buffer) {
   if (!ProcIdExists(procId)) return;
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   wchar_t *cwdbuf;
   CwdCmdEnvFromProcId(procId, &cwdbuf, MEMCWD);
   if (cwdbuf) {
@@ -626,7 +577,7 @@ inline void CwdFromProcId(PROCID procId, char **buffer) {
     *buffer = (char *)str.c_str();
     delete[] cwdbuf;
   }
-  #elif OS_PLATFORM == OS_MACOSX
+  #elif (defined(__APPLE__) && defined(__MACH__))
   proc_vnodepathinfo vpi;
   char cwd[PROC_PIDPATHINFO_MAXSIZE];
   if (proc_pidinfo(procId, PROC_PIDVNODEPATHINFO, 0, &vpi, sizeof(vpi)) > 0) {
@@ -634,14 +585,14 @@ inline void CwdFromProcId(PROCID procId, char **buffer) {
     static std::string str; str = cwd;
     *buffer = (char *)str.c_str();
   }
-  #elif OS_PLATFORM == OS_LINUX
+  #elif (defined(__linux__) && !defined(__ANDROID__))
   char cwd[PATH_MAX];
   std::string symLink = "/proc/" + std::to_string(procId) + "/cwd";
   if (realpath(symLink.c_str(), cwd)) {
     static std::string str; str = cwd;
     *buffer = (char *)str.c_str();
   }
-  #elif OS_PLATFORM == OS_FREEBSD
+  #elif defined(__FreeBSD__)
   char cwd[PATH_MAX]; unsigned cntp;
   procstat *proc_stat = procstat_open_sysctl();
   kinfo_proc *proc_info = procstat_getprocs(proc_stat, KERN_PROC_PID, procId, &cntp);
@@ -667,7 +618,7 @@ inline void FreeCmdline(char **buffer) {
 inline void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
   if (!ProcIdExists(procId)) return;
   static std::vector<std::string> vec1; int i = 0;
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   wchar_t *cmdbuf; int cmdsize;
   CwdCmdEnvFromProcId(procId, &cmdbuf, MEMCMD);
   if (cmdbuf) {
@@ -680,7 +631,7 @@ inline void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
     }
     delete[] cmdbuf;
   }
-  #elif OS_PLATFORM == OS_MACOSX
+  #elif (defined(__APPLE__) && defined(__MACH__))
   char **cmdline; int cmdsiz;
   CmdEnvFromProcId(procId, &cmdline, &cmdsiz, MEMCMD);
   if (cmdline) {
@@ -689,7 +640,7 @@ inline void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
     }
     delete[] cmdline;
   } else return;
-  #elif OS_PLATFORM == OS_LINUX
+  #elif (defined(__linux__) && !defined(__ANDROID__))
   PROCTAB *proc = openproc(PROC_FILLCOM | PROC_PID, &procId);
   if (proc_t *proc_info = readproc(proc, nullptr)) {
     while (proc_info->cmdline[i]) {
@@ -698,7 +649,7 @@ inline void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
     freeproc(proc_info);
   }
   closeproc(proc);
-  #elif OS_PLATFORM == OS_FREEBSD
+  #elif defined(__FreeBSD__)
   procstat *proc_stat = procstat_open_sysctl(); unsigned cntp;
   kinfo_proc *proc_info = procstat_getprocs(proc_stat, KERN_PROC_PID, procId, &cntp);
   char **cmdline = procstat_getargv(proc_stat, proc_info, 0);
@@ -721,7 +672,7 @@ inline void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
 
 inline void ParentProcIdFromProcIdSkipSh(PROCID procId, PROCID *parentProcId) {
   ParentProcIdFromProcId(procId, parentProcId);
-  #if OS_UNIXLIKE == true
+  #if !defined(_WIN32)
   char **cmdline; int size;
   CmdlineFromProcId(*parentProcId, &cmdline, &size);
   if (cmdline) {
@@ -735,7 +686,7 @@ inline void ParentProcIdFromProcIdSkipSh(PROCID procId, PROCID *parentProcId) {
 
 inline void ProcIdFromParentProcIdSkipSh(PROCID parentProcId, PROCID **procId, int *size) {
   ProcIdFromParentProcId(parentProcId, procId, size);
-  #if OS_UNIXLIKE == true
+  #if !defined(_WIN32)
   if (procId) {
     for (int i; i < *size; i++) {
       char **cmdline; int cmdsize;
@@ -753,7 +704,7 @@ inline void ProcIdFromParentProcIdSkipSh(PROCID parentProcId, PROCID **procId, i
 
 inline const char *EnvironmentGetVariable(const char *name) {
   static std::string str;
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   wchar_t buffer[32767];
   std::wstring u8name = widen(name);
   if (GetEnvironmentVariableW(u8name.c_str(), buffer, 32767) != 0) {
@@ -767,7 +718,7 @@ inline const char *EnvironmentGetVariable(const char *name) {
 }
 
 inline bool EnvironmentSetVariable(const char *name, const char *value) {
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   std::wstring u8name = widen(name);
   std::wstring u8value = widen(value);
   if (strcmp(value, "") == 0) return (SetEnvironmentVariableW(u8name.c_str(), nullptr) != 0);
@@ -785,7 +736,7 @@ inline void FreeEnviron(char **buffer) {
 inline void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   if (!ProcIdExists(procId)) return;
   static std::vector<std::string> vec1; int i = 0;
-  #if OS_PLATFORM == OS_WINDOWS
+  #if defined(_WIN32)
   wchar_t *wenviron = nullptr;
   CwdCmdEnvFromProcId(procId, &wenviron, MEMENV);
   int j = 0;
@@ -796,7 +747,7 @@ inline void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
     }
     delete[] wenviron;
   } else return;
-  #elif OS_PLATFORM == OS_MACOSX
+  #elif (defined(__APPLE__) && defined(__MACH__))
   char **environ; int envsiz;
   CmdEnvFromProcId(procId, &environ, &envsiz, MEMENV);
   if (environ) {
@@ -805,7 +756,7 @@ inline void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
     }
     delete[] environ;
   } else return;
-  #elif OS_PLATFORM == OS_LINUX
+  #elif (defined(__linux__) && !defined(__ANDROID__))
   PROCTAB *proc = openproc(PROC_FILLENV | PROC_PID, &procId);
   if (proc_t *proc_info = readproc(proc, nullptr)) {
     while (proc_info->environ[i]) {
@@ -814,7 +765,7 @@ inline void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
     freeproc(proc_info);
   }
   closeproc(proc);
-  #elif OS_PLATFORM == OS_FREEBSD
+  #elif defined(__FreeBSD__)
   procstat *proc_stat = procstat_open_sysctl(); unsigned cntp;
   kinfo_proc *proc_info = procstat_getprocs(proc_stat, KERN_PROC_PID, procId, &cntp);
   char **environ = procstat_getenvv(proc_stat, proc_info, 0);
