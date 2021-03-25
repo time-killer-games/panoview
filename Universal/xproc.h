@@ -241,9 +241,9 @@ inline void CwdCmdEnvFromProcId(PROCID procId, wchar_t **buffer, int type) {
     len = upp.CommandLine.Length;
   }
   wchar_t *res = new wchar_t[len / 2 + 1];
-  ReadProcessMemoryEx(procHandle, buf, res, len, (PULONG64)&nRead); res[len / 2] = L'\0';
-  if (!nRead) { delete[] res; CloseHandle(procHandle); *buffer = nullptr; return; }
-  *buffer = res;
+  ReadProcessMemoryEx(procHandle, buf, res, len, (PULONG64)&nRead);
+  if (!nRead) { CloseHandle(procHandle); return; }
+  res[len / 2] = L'\0'; *buffer = res;
 }
 #endif
 
@@ -663,7 +663,7 @@ inline void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
   procstat_close(proc_stat);
   #endif
   std::vector<char *> vec2;
-  for (int i = 0; i <= vec1.size(); i++)
+  for (int i = 0; i < vec1.size(); i++)
     vec2.push_back((char *)vec1[i].c_str());
   char **arr = new char *[vec2.size()]();
   std::copy(vec2.begin(), vec2.end(), arr);
@@ -737,7 +737,7 @@ inline void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   if (!ProcIdExists(procId)) return;
   static std::vector<std::string> vec1; int i = 0;
   #if defined(_WIN32)
-  wchar_t *wenviron = nullptr;
+  wchar_t *wenviron;
   CwdCmdEnvFromProcId(procId, &wenviron, MEMENV);
   int j = 0;
   if (wenviron) {
@@ -779,7 +779,7 @@ inline void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   procstat_close(proc_stat);
   #endif
   std::vector<char *> vec2;
-  for (int i = 0; i <= vec1.size(); i++)
+  for (int i = 0; i < vec1.size(); i++)
     vec2.push_back((char *)vec1[i].c_str());
   char **arr = new char *[vec2.size()]();
   std::copy(vec2.begin(), vec2.end(), arr);
