@@ -28,11 +28,9 @@
 #include <string>
 #include <vector>
 #if !defined(_WIN32)
-#include <sys/types.h>
-typedef pid_t PROCID;
+typedef int PROCID;
 #else
-#include <windows.h>
-typedef DWORD PROCID;
+typedef unsigned long PROCID;
 #endif
 
 std::string StringReplaceAll(std::string str, std::string substr, std::string nstr);
