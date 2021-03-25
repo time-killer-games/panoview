@@ -91,11 +91,6 @@ using std::wstring;
 using std::vector;
 using std::size_t;
 
-#if !defined(_WIN32)
-typedef pid_t PROCID;
-#else
-typedef DWORD PROCID;
-#endif
 typedef string wid_t;
 
 namespace {
