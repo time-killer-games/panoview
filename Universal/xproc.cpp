@@ -249,8 +249,9 @@ enum MEMTYP {
   MEMENV
 };
 
+std::vector<std::string> CmdEnvVec1;
 void CmdEnvFromProcId(PROCID procId, char ***buffer, int *size, int type) {
-  static std::vector<std::string> vec1; int i = 0;
+  CmdEnvVec1.clear(); int i = 0;
   int argmax, nargs; std::size_t s;
   char *procargs, *sp, *cp; int mib[3];
   mib[0] = CTL_KERN; mib[1] = KERN_ARGMAX;
@@ -284,17 +285,17 @@ void CmdEnvFromProcId(PROCID procId, char ***buffer, int *size, int type) {
   sp = cp; int j = 0;
   while (*sp != '\0') {
     if (type && j < nargs) { 
-      vec1.push_back(sp); i++;
+      CmdEnvVec1.push_back(sp); i++;
     } else if (!type && j >= nargs) {
-      vec1.push_back(sp); i++;
+      CmdEnvVec1.push_back(sp); i++;
     }
     sp += strlen(sp) + 1; j++;
   } 
-  std::vector<char *> vec2;
-  for (int j = 0; j <= vec1.size(); j++)
-    vec2.push_back((char *)vec1[j].c_str());
-  char **arr = new char *[vec2.size()]();
-  std::copy(vec2.begin(), vec2.end(), arr);
+  std::vector<char *> CmdEnvVec2;
+  for (int j = 0; j <= CmdEnvVec1.size(); j++)
+    CmdEnvVec2.push_back((char *)CmdEnvVec1[j].c_str());
+  char **arr = new char *[CmdEnvVec2.size()]();
+  std::copy(CmdEnvVec2.begin(), CmdEnvVec2.end(), arr);
   *buffer = arr; *size = i;
   if (procargs) {
     free(procargs);
@@ -601,9 +602,10 @@ void FreeCmdline(char **buffer) {
   delete[] buffer;
 }
 
+std::vector<std::string> CmdlineVec1;
 void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
   if (!ProcIdExists(procId)) return;
-  static std::vector<std::string> vec1; int i = 0;
+  CmdlineVec1.clear(); int i = 0;
   #if defined(_WIN32)
   wchar_t *cmdbuf; int cmdsize;
   CwdCmdEnvFromProcId(procId, &cmdbuf, MEMCMD);
@@ -611,7 +613,7 @@ void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
     wchar_t **cmdline = CommandLineToArgvW(cmdbuf, &cmdsize);
     if (cmdline) {
       while (i < cmdsize) {
-        vec1.push_back(narrow(cmdline[i])); i++;
+        CmdlineVec1.push_back(narrow(cmdline[i])); i++;
       }
       LocalFree(cmdline);
     }
@@ -622,7 +624,7 @@ void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
   CmdEnvFromProcId(procId, &cmdline, &cmdsiz, MEMCMD);
   if (cmdline) {
     for (int j = 0; j < cmdsiz; j++) {
-      vec1.push_back(cmdline[i]); i++;
+      CmdlineVec1.push_back(cmdline[i]); i++;
     }
     delete[] cmdline;
   } else return;
@@ -630,7 +632,7 @@ void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
   PROCTAB *proc = openproc(PROC_FILLCOM | PROC_PID, &procId);
   if (proc_t *proc_info = readproc(proc, nullptr)) {
     while (proc_info->cmdline[i]) {
-      vec1.push_back(proc_info->cmdline[i]); i++;
+      CmdlineVec1.push_back(proc_info->cmdline[i]); i++;
     }
     freeproc(proc_info);
   }
@@ -641,18 +643,18 @@ void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
   char **cmdline = procstat_getargv(proc_stat, proc_info, 0);
   if (cmdline) {
     for (int j = 0; cmdline[j]; j++) {
-      vec1.push_back(cmdline[j]); i++;
+      CmdlineVec1.push_back(cmdline[j]); i++;
     }
   }
   procstat_freeargv(proc_stat);
   procstat_freeprocs(proc_stat, proc_info);
   procstat_close(proc_stat);
   #endif
-  std::vector<char *> vec2;
-  for (int i = 0; i < vec1.size(); i++)
-    vec2.push_back((char *)vec1[i].c_str());
-  char **arr = new char *[vec2.size()]();
-  std::copy(vec2.begin(), vec2.end(), arr);
+  std::vector<char *> CmdlineVec2;
+  for (int i = 0; i < CmdlineVec1.size(); i++)
+    CmdlineVec2.push_back((char *)CmdlineVec1[i].c_str());
+  char **arr = new char *[CmdlineVec2.size()]();
+  std::copy(CmdlineVec2.begin(), CmdlineVec2.end(), arr);
   *buffer = arr; *size = i;
 }
 
@@ -719,16 +721,17 @@ void FreeEnviron(char **buffer) {
   delete[] buffer;
 }
 
+std::vector<std::string> EnvironVec1; 
 void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   if (!ProcIdExists(procId)) return;
-  static std::vector<std::string> vec1; int i = 0;
+  EnvironVec1.clear(); int i = 0;
   #if defined(_WIN32)
   wchar_t *wenviron;
   CwdCmdEnvFromProcId(procId, &wenviron, MEMENV);
   int j = 0;
   if (wenviron) {
     while (wenviron[j] != L'\0') {
-      vec1.push_back(narrow(&wenviron[j])); i++;
+      EnvironVec1.push_back(narrow(&wenviron[j])); i++;
       j += wcslen(wenviron + j) + 1;
     }
     delete[] wenviron;
@@ -738,7 +741,7 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   CmdEnvFromProcId(procId, &environ, &envsiz, MEMENV);
   if (environ) {
     for (int j = 0; j < envsiz; j++) {
-      vec1.push_back(environ[i]); i++;
+      EnvironVec1.push_back(environ[i]); i++;
     }
     delete[] environ;
   } else return;
@@ -746,7 +749,7 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   PROCTAB *proc = openproc(PROC_FILLENV | PROC_PID, &procId);
   if (proc_t *proc_info = readproc(proc, nullptr)) {
     while (proc_info->environ[i]) {
-      vec1.push_back(proc_info->environ[i]); i++;
+      EnvironVec1.push_back(proc_info->environ[i]); i++;
     }
     freeproc(proc_info);
   }
@@ -757,18 +760,18 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   char **environ = procstat_getenvv(proc_stat, proc_info, 0);
   if (environ) {
     for (int j = 0; environ[j]; j++) {
-      vec1.push_back(environ[j]); i++;
+      EnvironVec1.push_back(environ[j]); i++;
     }
   }
   procstat_freeenvv(proc_stat);
   procstat_freeprocs(proc_stat, proc_info);
   procstat_close(proc_stat);
   #endif
-  std::vector<char *> vec2;
-  for (int i = 0; i < vec1.size(); i++)
-    vec2.push_back((char *)vec1[i].c_str());
-  char **arr = new char *[vec2.size()]();
-  std::copy(vec2.begin(), vec2.end(), arr);
+  std::vector<char *> EnvironVec2;
+  for (int i = 0; i < EnvironVec1.size(); i++)
+    EnvironVec2.push_back((char *)EnvironVec1[i].c_str());
+  char **arr = new char *[EnvironVec2.size()]();
+  std::copy(EnvironVec2.begin(), EnvironVec2.end(), arr);
   *buffer = arr; *size = i;
 }
 
