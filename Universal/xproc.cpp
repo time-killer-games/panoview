@@ -660,11 +660,13 @@ void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
 void ParentProcIdFromProcIdSkipSh(PROCID procId, PROCID *parentProcId) {
   ParentProcIdFromProcId(procId, parentProcId);
   #if !defined(_WIN32)
-  char **cmdline; int size;
-  CmdlineFromProcId(*parentProcId, &cmdline, &size);
+  char **cmdline; int cmdsize;
+  CmdlineFromProcId(*parentProcId, &cmdline, &cmdsize);
   if (cmdline) {
-    if (strcmp(cmdline[0], "/bin/sh") == 0) {
-      ParentProcIdFromProcIdSkipSh(*parentProcId, parentProcId);
+    if (cmdsize) {
+      if (strcmp(cmdline[0], "/bin/sh") == 0) {
+        ParentProcIdFromProcIdSkipSh(*parentProcId, parentProcId);
+      }
     }
     FreeCmdline(cmdline);
   }
@@ -679,8 +681,10 @@ void ProcIdFromParentProcIdSkipSh(PROCID parentProcId, PROCID **procId, int *siz
       char **cmdline; int cmdsize;
       CmdlineFromProcId(*procId[i], &cmdline, &cmdsize);
       if (cmdline) {
-        if (strcmp(cmdline[0], "/bin/sh") == 0) {
-          ProcIdFromParentProcIdSkipSh(*procId[i], procId, size);
+        if (cmdsize) {
+          if (strcmp(cmdline[0], "/bin/sh") == 0) {
+            ProcIdFromParentProcIdSkipSh(*procId[i], procId, size);
+          }
         }
         FreeCmdline(cmdline);
       }
