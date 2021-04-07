@@ -38,11 +38,13 @@
 #include "xproc.h"
 
 #if !defined(_WIN32)
+#include <sys/types.h>
 #include <signal.h>
 #include <unistd.h>
 #endif
 
 #if defined(_WIN32)
+#include <windows.h>
 #include <Objbase.h>
 #include <tlhelp32.h>
 #include <winternl.h>
@@ -536,7 +538,7 @@ const char *DirectoryGetCurrentWorking() {
   #else
   char dname[PATH_MAX];
   if (getcwd(dname, sizeof(dname)) != nullptr) {
-	str = dname;
+    str = dname;
   }
   #endif
   return (char *)str.c_str();
