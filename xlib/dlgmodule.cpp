@@ -3,6 +3,7 @@
  MIT License
 
  Copyright © 2021 Samuel Venable
+ Copyright © 2021 Nikita Krapivin
  Copyright © 2021 Robert B. Colton
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -30,28 +31,38 @@
 #include <cstring>
 #include <climits>
 
-#include <thread>
-#include <sstream>
-#include <vector>
 #include <string>
+#include <thread>
+#include <chrono>
+#include <vector>
+#include <sstream>
 #include <algorithm>
 
 #include "../Universal/dlgmodule.h"
-#include "../Universal/xproc.h"
 #include "../Unix/lodepng.h"
-
-#include <X11/Xlib.h>
-#include <X11/Xatom.h>
-#include <X11/Xutil.h>
 
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 
+#include <pthread.h>
 #include <libgen.h>
 #include <unistd.h>
-#include <signal.h>
 #include <fcntl.h>
+
+#include <X11/Xlib.h>
+#include <X11/Xatom.h>
+#include <X11/Xutil.h>
+
+#if defined(__APPLE__) && defined(__MACH__)
+#include <sys/proc_info.h>
+#include <libproc.h>
+#elif defined(__linux__) && !defined(__ANDROID__)
+#include <proc/readproc.h>
+#elif defined(__FreeBSD__)
+#include <sys/user.h>
+#include <libutil.h>
+#endif
 
 using std::string;
 using std::to_string;
@@ -204,23 +215,32 @@ string filename_ext(string fname) {
   return fname.substr(fp);
 }
 
-int XErrorHandlerImpl(Display *display, XErrorEvent *event) {
+static int XErrorHandlerImpl(Display *display, XErrorEvent *event) {
   return 0;
 }
 
-int XIOErrorHandlerImpl(Display *display) {
+static int XIOErrorHandlerImpl(Display *display) {
   return 0;
 }
 
-void SetErrorHandlers() {
+static void SetErrorHandlers() {
   XSetErrorHandler(XErrorHandlerImpl);
   XSetIOErrorHandler(XIOErrorHandlerImpl);
 }
 
-unsigned long get_wid_or_pid(Display *display, Window window, bool wid) {
+static bool kwin_running() {
+  SetErrorHandlers();
+  Display *d = XOpenDisplay(nullptr);
+  Atom aKWinRunning = XInternAtom(d, "KWIN_RUNNING", True);
+  bool bKWinRunning = (aKWinRunning != None);
+  XCloseDisplay(d);
+  return bKWinRunning;
+}
+
+static unsigned long GetActiveWidOrWindowPid(Display *display, Window window, bool wid) {
   SetErrorHandlers();
   unsigned char *prop;
-  unsigned long property;
+  unsigned long property = 0;
   Atom actual_type, filter_atom;
   int actual_format, status;
   unsigned long nitems, bytes_after;
@@ -234,18 +254,19 @@ unsigned long get_wid_or_pid(Display *display, Window window, bool wid) {
   return property;
 }
 
-Window wid_from_top(Display *display) {
+static Window WidFromTop(Display *display) {
   SetErrorHandlers();
   int screen = XDefaultScreen(display);
   Window window = RootWindow(display, screen);
-  return (Window)get_wid_or_pid(display, window, true);
+  return (Window)GetActiveWidOrWindowPid(display, window, true);
 }
 
-pid_t pid_from_wid(Display *display, Window window) {
-  return (pid_t)get_wid_or_pid(display, window, false);
+static pid_t PidFromWid(Display *display, Window window) {
+  return (pid_t)GetActiveWidOrWindowPid(display, window, false);
 }
 
-pid_t process_execute(const char *command, int *infp, int *outfp) {
+// create dialog process
+static pid_t ProcessCreate(const char *command, int *infp, int *outfp) {
   int p_stdin[2];
   int p_stdout[2];
   pid_t pid;
@@ -290,40 +311,86 @@ pid_t process_execute(const char *command, int *infp, int *outfp) {
   return pid;
 }
 
-static void *modify_dialog(void *pid) {
-  SetErrorHandlers();
-  Display *display = XOpenDisplay(nullptr);
-  Window wid = wid_from_top(display),
-    pwid = owner ? (Window)owner : wid;
-  while (pid_from_wid(display, wid) != (pid_t)(std::intptr_t)pid) {
-    wid = wid_from_top(display);
+#if defined(__APPLE__) && defined(__MACH__)
+static void PpidFromPid(pid_t procId, pid_t *parentProcId) {
+  proc_bsdinfo proc_info;
+  if (proc_pidinfo(procId, PROC_PIDTBSDINFO, 0, &proc_info, sizeof(proc_info)) > 0) {
+    *parentProcId = proc_info.pbi_ppid;
   }
-  XSetTransientForHint(display, wid, (Window)pwid);
+}
+#endif
+
+static std::vector<pid_t> PidFromPpid(pid_t parentProcId) {
+  std::vector<pid_t> vec;
+  #if defined(__APPLE__) && defined(__MACH__)
+  int cntp = proc_listpids(PROC_ALL_PIDS, 0, nullptr, 0);
+  std::vector<pid_t> proc_info(cntp);
+  std::fill(proc_info.begin(), proc_info.end(), 0);
+  proc_listpids(PROC_ALL_PIDS, 0, &proc_info[0], sizeof(pid_t) * cntp);
+  for (int j = cntp; j > 0; j--) {
+    if (proc_info[j] == 0) { continue; }
+    pid_t ppid; PpidFromPid(proc_info[j], &ppid);
+    if (ppid == parentProcId) {
+      vec.push_back(proc_info[j]);
+    }
+  }
+  #elif defined(__linux__) && !defined(__ANDROID__)
+  PROCTAB *proc = openproc(PROC_FILLSTAT);
+  while (proc_t *proc_info = readproc(proc, nullptr)) {
+    if (proc_info->ppid == parentProcId) {
+      vec.push_back(proc_info->tgid);
+    }
+    freeproc(proc_info);
+  }
+  closeproc(proc);
+  #elif defined(__FreeBSD__)
+  int cntp; if (kinfo_proc *proc_info = kinfo_getallproc(&cntp)) {
+    for (int j = 0; j < cntp; j++) {
+      if (proc_info[j].ki_ppid == parentProcId) {
+        vec.push_back(proc_info[j].ki_pid);
+      }
+    }
+    free(proc_info);
+  }
+  #endif
+  return vec;
+}
+
+static pid_t PidFromPpidRecursive(pid_t parentProcId) {
+  std::vector<pid_t> pidVec = PidFromPpid(parentProcId);
+  if (pidVec.size()) {
+    parentProcId = PidFromPpidRecursive(pidVec[0]);
+  }
+  return parentProcId;
+}
+
+static void *modify_shell_dialog(void *pid) {
+  SetErrorHandlers();
+  Display *display = XOpenDisplay(nullptr); Window wid;
+  pid_t child = PidFromPpidRecursive((pid_t)(std::intptr_t)pid);
+  while (true) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    wid = WidFromTop(display);
+    if (PidFromWid(display, wid) == child) {
+      break;
+    }
+  }
+  XSetTransientForHint(display, wid, (Window)(std::intptr_t)owner);
   int len = caption.length() + 1; char *buffer = new char[len]();
   strcpy(buffer, caption.c_str()); XChangeProperty(display, wid,
   XInternAtom(display, "_NET_WM_NAME", false),
   XInternAtom(display, "UTF8_STRING", false),
-  8, PropModeReplace, (unsigned char *)buffer, len); delete[] buffer;
-  if (file_exists(current_icon) && filename_ext(current_icon) == ".png")
-    XSetIcon(display, wid, current_icon.c_str());
-  XCloseDisplay(display);
+  8, PropModeReplace, (unsigned char *)buffer, len);
+  delete[] buffer; XCloseDisplay(display);
   return nullptr;
 }
 
 string create_shell_dialog(string command) {
   string output; char buffer[BUFSIZ];
   int outfp = 0, infp = 0; ssize_t nRead = 0;
-  pid_t pid = process_execute(command.c_str(), &infp, &outfp);
+  pid_t pid = ProcessCreate(command.c_str(), &infp, &outfp);
   std::this_thread::sleep_for(std::chrono::milliseconds(100)); pthread_t thread;
-  pid_t *pids; int size; XProc::ProcIdFromParentProcIdSkipSh(pid, &pids, &size);
-  if (pids) {
-    pthread_create(&thread, nullptr,
-    modify_dialog, (void *)(std::intptr_t)pids[0]);
-    free(pids);
-  } else {
-    pthread_create(&thread, nullptr,
-    modify_dialog, (void *)(std::intptr_t)pid);
-  }
+  pthread_create(&thread, nullptr, modify_shell_dialog, (void *)(std::intptr_t)pid);
   while ((nRead = read(outfp, buffer, BUFSIZ)) > 0) {
     buffer[nRead] = '\0';
     output.append(buffer, nRead);
@@ -358,7 +425,7 @@ string zenity_filter(string input) {
   unsigned index = 0;
   for (string str : stringVec) {
     if (index % 2 == 0)
-      string_output += string(" --file-filter=\"") + 
+      string_output += string(" --file-filter=\"") +
         add_escaping(string_replace_all(str, "*.*", "*"), false, "") + string("|");
     else {
       std::replace(str.begin(), str.end(), ';', ' ');
@@ -409,7 +476,7 @@ int make_color_rgb(unsigned char r, unsigned char g, unsigned char b) {
   return r | (g << 8) | (b << 16);
 }
 
-int show_message_helperfunc(char *str) {  
+int show_message_helperfunc(char *str) {
   change_relative_to_kwin();
   string str_command;
   string str_title = message_cancel ? add_escaping(caption, true, "Question") : add_escaping(caption, true, "Information");
@@ -944,7 +1011,7 @@ void widget_set_owner(char *hwnd) {
 }
 
 char *widget_get_icon() {
-  if (current_icon == "") 
+  if (current_icon == "")
     current_icon = filename_absolute("assets/icon.png");
   return (char *)current_icon.c_str();
 }
@@ -965,7 +1032,7 @@ char *widget_get_system() {
 
 void widget_set_system(char *sys) {
   string str_sys = sys;
-  
+
   if (str_sys == "X11")
     dm_dialogengine = dm_x11;
 
