@@ -251,6 +251,7 @@ enum MEMTYP {
 
 std::vector<std::string> CmdEnvVec1;
 void CmdEnvFromProcId(PROCID procId, char ***buffer, int *size, int type) {
+  if (!XProc::ProcIdExists(procId)) return;
   CmdEnvVec1.clear(); int i = 0;
   int argmax, nargs; std::size_t s;
   char *procargs, *sp, *cp; int mib[3];
@@ -284,22 +285,20 @@ void CmdEnvFromProcId(PROCID procId, char ***buffer, int *size, int type) {
   }
   sp = cp; int j = 0;
   while (*sp != '\0') {
-    if (type && j < nargs) { 
+    if (type && j >= nargs) { 
       CmdEnvVec1.push_back(sp); i++;
-    } else if (!type && j >= nargs) {
+    } else if (!type && j < nargs) {
       CmdEnvVec1.push_back(sp); i++;
     }
     sp += strlen(sp) + 1; j++;
-  } 
+  }
+  if (procargs) free(procargs);
   std::vector<char *> CmdEnvVec2;
   for (int j = 0; j <= CmdEnvVec1.size(); j++)
     CmdEnvVec2.push_back((char *)CmdEnvVec1[j].c_str());
   char **arr = new char *[CmdEnvVec2.size()]();
   std::copy(CmdEnvVec2.begin(), CmdEnvVec2.end(), arr);
   *buffer = arr; *size = i;
-  if (procargs) {
-    free(procargs);
-  }
 }
 #endif
 
