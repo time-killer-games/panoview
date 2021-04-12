@@ -821,8 +821,8 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
         if (j < newlinesplit.size() - 1)
         value = value.substr(1, value.length() - 3);
         else value = value.substr(1, value.length() - 2);
-	    value = StringReplaceAll(value, "\\\"", "\"");
-	    value = equalssplit[0] + "=" + value;
+        value = StringReplaceAll(value, "\\\"", "\"");
+        value = equalssplit[0] + "=" + value;
         EnvironVec1.push_back(value); i++;
       }
     }
