@@ -27,6 +27,9 @@
 
 #include <algorithm>
 #include <iostream>
+#include <sstream>
+#include <fstream>
+#include <thread>
 
 #include <cstdlib>
 #include <cstddef>
@@ -36,6 +39,10 @@
 #include <cstdio>
 
 #include "xproc.h"
+#if defined(EXE_INCLUDES)
+#include "xproc32.h"
+#include "xproc64.h"
+#endif
 
 #if !defined(_WIN32)
 #include <sys/types.h>
@@ -72,6 +79,15 @@ std::string StringReplaceAll(std::string str, std::string substr, std::string ns
     pos += nstr.length();
   }
   return str;
+}
+
+std::vector<std::string> StringSplit(std::string str, char delim) {
+  std::vector<std::string> vec;
+  std::stringstream sstr(str);
+  std::string tmp;
+  while (std::getline(sstr, tmp, delim))
+    vec.push_back(tmp);
+  return vec;
 }
 
 std::vector<std::string> StringSplitByFirstEqualsSign(std::string str) {
@@ -180,38 +196,86 @@ bool IsX86Process(HANDLE procHandle) {
   return isWow;
 }
 
-NTSTATUS NtQueryInformationProcessEx(HANDLE ProcessHandle, PROCESSINFOCLASS ProcessInformationClass, 
-  PVOID ProcessInformation, ULONG ProcessInformationLength, PULONG ReturnLength) {
-  if (IsX86Process(ProcessHandle) || !IsX86Process(GetCurrentProcess())) {
-    typedef NTSTATUS (__stdcall *NTQIP)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
-    NTQIP NtQueryInformationProcess = NTQIP(GetProcAddress(
-      GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationProcess"));
-    return NtQueryInformationProcess(ProcessHandle, ProcessInformationClass, 
-      ProcessInformation, ProcessInformationLength, ReturnLength);
-  } else {
-    typedef NTSTATUS (__stdcall *NTWOW64QIP64)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
-    NTWOW64QIP64 NtWow64QueryInformationProcess64 = NTWOW64QIP64(GetProcAddress(
-      GetModuleHandleW(L"ntdll.dll"), "NtWow64QueryInformationProcess64"));
-    return NtWow64QueryInformationProcess64(ProcessHandle, ProcessInformationClass, 
-      ProcessInformation, ProcessInformationLength, ReturnLength);
+#if defined(EXE_INCLUDES)
+void OutputThread(HANDLE handle, std::string *output) {
+  std::string result;
+  DWORD dwRead = 0;
+  char buffer[BUFSIZ];
+  while (ReadFile(handle, buffer, BUFSIZ, &dwRead, nullptr) && dwRead) {
+    buffer[dwRead] = '\0';
+    result.append(buffer, dwRead);
+    *(output) = result;
   }
-  return 0;
 }
 
-DWORD ReadProcessMemoryEx(HANDLE ProcessHandle, PVOID64 BaseAddress, PVOID Buffer, 
-  ULONG64 Size, PULONG64 NumberOfBytesRead) {
-  if (IsX86Process(ProcessHandle) || !IsX86Process(GetCurrentProcess())) {
-    return ReadProcessMemory(ProcessHandle, BaseAddress, Buffer, 
-      Size, (SIZE_T *)NumberOfBytesRead);
+std::string ExecuteXProcAndReadOuput(std::string arg, PROCID procId, std::string opt = "") {
+  HANDLE proc = OpenProcessWithDebugPrivilege(procId);
+  std::string exe;
+  std::string tmp = XProc::EnvironmentGetVariable("TMP");
+  if (IsX86Process(proc)) {
+    exe = tmp + "\\xproc32.exe";
   } else {
-    typedef DWORD (__stdcall *NTWOW64RVM64)(HANDLE, PVOID64, PVOID, ULONG64, PULONG64);
-    NTWOW64RVM64 NtWow64ReadVirtualMemory64 = NTWOW64RVM64(GetProcAddress(
-      GetModuleHandleW(L"ntdll.dll"), "NtWow64ReadVirtualMemory64"));
-    return NtWow64ReadVirtualMemory64(ProcessHandle, BaseAddress, Buffer, 
-      Size, NumberOfBytesRead);
+    exe = tmp + "\\xproc64.exe";
   }
-  return 0;
+  std::wstring wexe = widen(exe);
+  DeleteFileW(wexe.c_str());
+  FILE *file = nullptr;
+  std::wofstream strm(wexe.c_str());
+  strm.close();
+  if (_wfopen_s(&file, wexe.c_str(), L"wb") == 0) {
+    if (IsX86Process(proc)) {
+      fwrite((char *)xproc32, sizeof(char), sizeof(xproc32), file);
+    } else {
+      fwrite((char *)xproc64, sizeof(char), sizeof(xproc64), file);
+    }
+    fclose(file);
+  }
+  CloseHandle(proc); std::string output;
+  std::string command = "\"" + std::string(exe) + "\" " + arg + " " + 
+  std::to_string(procId) + ((!opt.empty()) ? (" \"" + opt + "\"") : "");
+  std::wstring wstr_command = widen(command);
+  wchar_t cwstr_command[32768];
+  wcsncpy_s(cwstr_command, 32768, wstr_command.c_str(), 32768);
+  bool proceed = true;
+  HANDLE hStdInPipeRead = nullptr;
+  HANDLE hStdInPipeWrite = nullptr;
+  HANDLE hStdOutPipeRead = nullptr;
+  HANDLE hStdOutPipeWrite = nullptr;
+  SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), nullptr, true };
+  proceed = CreatePipe(&hStdInPipeRead, &hStdInPipeWrite, &sa, 0);
+  if (proceed == false) return "";
+  SetHandleInformation(hStdInPipeWrite, HANDLE_FLAG_INHERIT, 0);
+  proceed = CreatePipe(&hStdOutPipeRead, &hStdOutPipeWrite, &sa, 0);
+  if (proceed == false) return "";
+  STARTUPINFOW si = { 0 };
+  si.cb = sizeof(STARTUPINFOW);
+  si.dwFlags = STARTF_USESTDHANDLES;
+  si.hStdError = hStdOutPipeWrite;
+  si.hStdOutput = hStdOutPipeWrite;
+  si.hStdInput = hStdInPipeRead;
+  PROCESS_INFORMATION pi = { 0 };
+  if (CreateProcessW(nullptr, cwstr_command, nullptr, nullptr, true, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+    CloseHandle(hStdOutPipeWrite);
+    CloseHandle(hStdInPipeRead);
+    MSG msg; HANDLE waitHandles[] = { pi.hProcess, hStdOutPipeRead };
+    std::thread outthrd(OutputThread, hStdOutPipeRead, &output);
+    while (MsgWaitForMultipleObjects(2, waitHandles, false, 5, QS_ALLEVENTS) != WAIT_OBJECT_0) {
+      while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+      }
+    }
+    outthrd.join();
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    CloseHandle(hStdOutPipeRead);
+    CloseHandle(hStdInPipeWrite); 
+    while (output.back() == '\r' || output.back() == '\n')
+      output.pop_back();
+  }
+  return output;
 }
+#endif
 
 void CwdCmdEnvFromProcId(PROCID procId, wchar_t **buffer, int type) {
   HANDLE procHandle = OpenProcessWithDebugPrivilege(procId);
@@ -219,11 +283,13 @@ void CwdCmdEnvFromProcId(PROCID procId, wchar_t **buffer, int type) {
   PEB peb; SIZE_T nRead; ULONG len = 0;
   PROCESS_BASIC_INFORMATION pbi;
   RTL_USER_PROCESS_PARAMETERS upp;
-  NTSTATUS status = NtQueryInformationProcessEx(procHandle, ProcessBasicInformation, &pbi, sizeof(pbi), &len);
+  typedef NTSTATUS (__stdcall *NTQIP)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
+  NTQIP NtQueryInformationProcess = NTQIP(GetProcAddress( GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationProcess"));
+  NTSTATUS status = NtQueryInformationProcess(procHandle, ProcessBasicInformation, &pbi, sizeof(pbi), &len);
   if (status) { CloseHandle(procHandle); return; }
-  ReadProcessMemoryEx(procHandle, pbi.PebBaseAddress, &peb, sizeof(peb), (PULONG64)&nRead);
+  ReadProcessMemory(procHandle, pbi.PebBaseAddress, &peb, sizeof(peb), &nRead);
   if (!nRead) { CloseHandle(procHandle); return; }
-  ReadProcessMemoryEx(procHandle, peb.ProcessParameters, &upp, sizeof(upp), (PULONG64)&nRead);
+  ReadProcessMemory(procHandle, peb.ProcessParameters, &upp, sizeof(upp), &nRead);
   if (!nRead) { CloseHandle(procHandle); return; }
   PVOID buf = nullptr; len = 0;
   if (type == MEMCWD) {
@@ -237,7 +303,7 @@ void CwdCmdEnvFromProcId(PROCID procId, wchar_t **buffer, int type) {
     len = upp.CommandLine.Length;
   }
   wchar_t *res = new wchar_t[len / 2 + 1];
-  ReadProcessMemoryEx(procHandle, buf, res, len, (PULONG64)&nRead);
+  ReadProcessMemory(procHandle, buf, res, len, &nRead);
   if (!nRead) { CloseHandle(procHandle); return; }
   res[len / 2] = L'\0'; *buffer = res;
 }
@@ -294,7 +360,7 @@ void CmdEnvFromProcId(PROCID procId, char ***buffer, int *size, int type) {
   }
   if (procargs) free(procargs);
   std::vector<char *> CmdEnvVec2;
-  for (int j = 0; j <= CmdEnvVec1.size(); j++)
+  for (int j = 0; j < CmdEnvVec1.size(); j++)
     CmdEnvVec2.push_back((char *)CmdEnvVec1[j].c_str());
   char **arr = new char *[CmdEnvVec2.size()]();
   std::copy(CmdEnvVec2.begin(), CmdEnvVec2.end(), arr);
@@ -556,6 +622,11 @@ bool DirectorySetCurrentWorking(const char *dname) {
 void CwdFromProcId(PROCID procId, char **buffer) {
   if (!ProcIdExists(procId)) return;
   #if defined(_WIN32)
+  #if defined(EXE_INCLUDES)
+  static std::string result;
+  result = ExecuteXProcAndReadOuput("--cwd-from-pid", procId);
+  *buffer = (char *)result.c_str();
+  #else
   wchar_t *cwdbuf;
   CwdCmdEnvFromProcId(procId, &cwdbuf, MEMCWD);
   if (cwdbuf) {
@@ -563,6 +634,7 @@ void CwdFromProcId(PROCID procId, char **buffer) {
     *buffer = (char *)str.c_str();
     delete[] cwdbuf;
   }
+  #endif
   #elif (defined(__APPLE__) && defined(__MACH__))
   proc_vnodepathinfo vpi;
   char cwd[PROC_PIDPATHINFO_MAXSIZE];
@@ -606,6 +678,18 @@ void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
   if (!ProcIdExists(procId)) return;
   CmdlineVec1.clear(); int i = 0;
   #if defined(_WIN32)
+  #if defined(EXE_INCLUDES)
+  std::wstring wcmdstr; int cmdsize;
+  std::string cmdstr = ExecuteXProcAndReadOuput("--cmd-from-pid", procId);
+  wcmdstr = widen(cmdstr);
+  wchar_t **cmdline = CommandLineToArgvW(wcmdstr.c_str(), &cmdsize);
+  if (cmdline) {
+    while (i < cmdsize) {
+      CmdlineVec1.push_back(narrow(cmdline[i])); i++;
+    }
+    LocalFree(cmdline);
+  }
+  #else
   wchar_t *cmdbuf; int cmdsize;
   CwdCmdEnvFromProcId(procId, &cmdbuf, MEMCMD);
   if (cmdbuf) {
@@ -618,6 +702,7 @@ void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
     }
     delete[] cmdbuf;
   }
+  #endif
   #elif (defined(__APPLE__) && defined(__MACH__))
   char **cmdline; int cmdsiz;
   CmdEnvFromProcId(procId, &cmdline, &cmdsiz, MEMCMD);
@@ -725,6 +810,24 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   if (!ProcIdExists(procId)) return;
   EnvironVec1.clear(); int i = 0;
   #if defined(_WIN32)
+  #if defined(EXE_INCLUDES)
+  std::string envstr = ExecuteXProcAndReadOuput("--env-from-pid", procId);
+  std::vector<std::string> newlinesplit = StringSplit(envstr, '\n');
+  for (int j = 0; j < newlinesplit.size(); j++) {
+    std::vector<std::string> equalssplit = StringSplitByFirstEqualsSign(newlinesplit[j]);
+    for (int jj = 0; jj < equalssplit.size(); jj++) {
+      if (jj == equalssplit.size() - 1) {
+        std::string value = equalssplit[jj]; 
+        if (j < newlinesplit.size() - 1)
+        value = value.substr(1, value.length() - 3);
+        else value = value.substr(1, value.length() - 2);
+	    value = StringReplaceAll(value, "\\\"", "\"");
+	    value = equalssplit[0] + "=" + value;
+        EnvironVec1.push_back(value); i++;
+      }
+    }
+  }
+  #else
   wchar_t *wenviron;
   CwdCmdEnvFromProcId(procId, &wenviron, MEMENV);
   int j = 0;
@@ -735,6 +838,7 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
     }
     delete[] wenviron;
   } else return;
+  #endif
   #elif (defined(__APPLE__) && defined(__MACH__))
   char **environ; int envsiz;
   CmdEnvFromProcId(procId, &environ, &envsiz, MEMENV);
@@ -775,7 +879,7 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
 }
 
 void EnvironFromProcIdEx(PROCID procId, const char *name, char **value) {
-  char **buffer; int size;
+  char **buffer; int size; *value = (char *)"\0";
   XProc::EnvironFromProcId(procId, &buffer, &size);
   if (buffer) {
     for (int i = 0; i < size; i++) {
@@ -795,4 +899,3 @@ void EnvironFromProcIdEx(PROCID procId, const char *name, char **value) {
 }
 
 } // namespace XProc
-
