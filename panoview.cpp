@@ -40,7 +40,7 @@
 #include <cstdio>
 #include <cmath>
 
-#include "Universal/xproc.h"
+#include "Universal/crossprocess.h"
 #include "Universal/dlgmodule.h"
 #if defined(_WIN32)
 #include "Win32/libpng-util.h"
@@ -98,6 +98,20 @@ namespace {
 string cwd;
 wid_t WindowID  = "-1"; 
 const double PI = 3.141592653589793;
+
+#if defined(_WIN32)
+wstring widen(string str) {
+  size_t wchar_count = str.size() + 1;
+  vector<wchar_t> buf(wchar_count);
+  return wstring { buf.data(), (size_t)MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, buf.data(), (int)wchar_count) };
+}
+
+string narrow(wstring wstr) {
+  int nbytes = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.length(), nullptr, 0, nullptr, nullptr);
+  vector<char> buf(nbytes);
+  return string { buf.data(), (size_t)WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.length(), buf.data(), nbytes, nullptr, nullptr) };
+}
+#endif
 
 void LoadImage(unsigned char **out, unsigned *pngwidth, unsigned *pngheight, 
   const char *fname) {
@@ -223,6 +237,16 @@ void DrawCursor(GLuint texid, int curx, int cury, int curwidth, int curheight) {
 SDL_Window *hidden = nullptr;
 #endif
 
+vector<string> StringSplitByFirstEqualsSign(string str) {
+  size_t pos = 0;
+  vector<string> vec;
+  if ((pos = str.find_first_of("=")) != string::npos) {
+    vec.push_back(str.substr(0, pos));
+    vec.push_back(str.substr(pos + 1));
+  }
+  return vec;
+}
+
 vector<string> StringSplit(string str, string delim) {
   vector<string> vec;
   std::stringstream sstr(str);
@@ -230,6 +254,15 @@ vector<string> StringSplit(string str, string delim) {
   while (std::getline(sstr, tmp, delim[0]))
     vec.push_back(tmp);
   return vec;
+}
+
+string StringReplaceAll(string str, string substr, string nstr) {
+  size_t pos = 0;
+  while ((pos = str.find(substr, pos)) != string::npos) {
+    str.replace(pos, substr.length(), nstr);
+    pos += nstr.length();
+  }
+  return str;
 }
 
 void EnvironFromStdInput(string name, string *value) {
@@ -570,7 +603,7 @@ int main(int argc, char **argv) {
   dialog_module::widget_set_owner((char *)"-1");
   #endif
 
-  XProc::DirectorySetCurrentWorking((cwd + "/examples").c_str());
+  CrossProcess::DirectorySetCurrentWorking((cwd + "/examples").c_str());
   dialog_module::widget_set_icon((char *)(cwd + "/icon.png").c_str());
   panorama = dialog_module::get_open_filename_ext((char *)
   "Portable Network Graphic (*.png)|*.png;*.PNG",
@@ -579,7 +612,7 @@ int main(int argc, char **argv) {
   if (strcmp(panorama.c_str(), "") == 0) { 
   glutDestroyWindow(window); exit(0); } } else { panorama = argv[1]; }
   string cursor = (argc > 2) ? argv[2] : cwd + "/cursor.png";
-  XProc::DirectorySetCurrentWorking(cwd.c_str());
+  CrossProcess::DirectorySetCurrentWorking(cwd.c_str());
 
   glClearDepth(1);
   glEnable(GL_DEPTH_TEST);
@@ -593,8 +626,8 @@ int main(int argc, char **argv) {
   glutMouseFunc(mouse);
   glutTimerFunc(0, timer, 0);
 
-  string str1 = XProc::EnvironmentGetVariable("PANORAMA_XANGLE");
-  string str2 = XProc::EnvironmentGetVariable("PANORAMA_YANGLE");
+  string str1 = CrossProcess::EnvironmentGetVariable("PANORAMA_XANGLE");
+  string str2 = CrossProcess::EnvironmentGetVariable("PANORAMA_YANGLE");
   double initxangle = strtod((!str1.empty()) ? str1.c_str() : "0", nullptr); 
   double inityangle = strtod((!str2.empty()) ? str2.c_str() : "0", nullptr);
   
