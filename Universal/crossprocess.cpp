@@ -161,13 +161,13 @@ HANDLE OpenProcessWithDebugPrivilege(PROCID procId) {
   return proc;
 }
 
-bool IsX86Process(HANDLE proc) {
-  bool isWow = true;
+BOOL IsX86Process(HANDLE proc) {
+  BOOL isWow = true;
   SYSTEM_INFO systemInfo = { 0 };
   GetNativeSystemInfo(&systemInfo);
   if (systemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL)
     return isWow;
-  IsWow64Process(proc, (PBOOL)&isWow);
+  IsWow64Process(proc, &isWow);
   return isWow;
 }
 
@@ -551,7 +551,7 @@ const char *DirectoryGetCurrentWorking() {
     str = dname;
   }
   #endif
-  return (char *)str.c_str();
+  return str.c_str();
 }
 
 bool DirectorySetCurrentWorking(const char *dname) {
@@ -570,10 +570,12 @@ void CwdFromProcId(PROCID procId, char **buffer) {
   if (proc == nullptr) return;
   #if defined(EXE_INCLUDES)
   if (IsX86Process(GetCurrentProcess()) != IsX86Process(proc)) {
-    static std::string str;
-    std::string exe; std::string tmp = EnvironmentGetVariable("TMP");
-    if (IsX86Process(proc)) { exe = tmp + "\\crossprocess32.exe"; } 
-    else { exe = tmp + "\\crossprocess64.exe"; }
+    std::string exe; std::string tmp;
+    wchar_t tempPath[MAX_PATH + 1]; 
+    if (!GetTempPathW(MAX_PATH + 1, tempPath))
+    return; tmp = narrow(tempPath);
+    if (IsX86Process(proc)) exe = tmp + "\\crossprocess32.exe";
+    else exe = tmp + "\\crossprocess64.exe";
     std::wstring wexe = widen(exe);
     if (!PathFileExistsW(wexe.c_str())) {
       FILE *file = nullptr;
@@ -588,6 +590,7 @@ void CwdFromProcId(PROCID procId, char **buffer) {
         fclose(file);
       }
     }
+    static std::string str;
     str = ExecuteProcessAndReadOutput("\"" + exe + "\" --cwd-from-pid " + std::to_string(procId));
     *buffer = (char *)str.c_str(); 
   } else {
@@ -656,9 +659,13 @@ void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
   if (proc == nullptr) return;
   #if defined(EXE_INCLUDES)
   if (IsX86Process(GetCurrentProcess()) != IsX86Process(proc)) {
-    std::string exe; std::string tmp = EnvironmentGetVariable("TMP");
-    if (IsX86Process(proc)) { exe = tmp + "\\crossprocess32.exe"; } 
-    else { exe = tmp + "\\crossprocess64.exe"; }
+    if (proc == nullptr) return;
+    std::string exe; std::string tmp;
+    wchar_t tempPath[MAX_PATH + 1]; 
+    if (!GetTempPathW(MAX_PATH + 1, tempPath))
+    return; tmp = narrow(tempPath);
+    if (IsX86Process(proc)) exe = tmp + "\\crossprocess32.exe";
+    else exe = tmp + "\\crossprocess64.exe";
     std::wstring wexe = widen(exe);
     if (!PathFileExistsW(wexe.c_str())) {
       FILE *file = nullptr;
@@ -786,7 +793,7 @@ const char *EnvironmentGetVariable(const char *name) {
   char *value = getenv(name);
   str = value ? : "";
   #endif
-  return (char *)str.c_str();
+  return str.c_str();
 }
 
 bool EnvironmentSetVariable(const char *name, const char *value) {
@@ -814,9 +821,13 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   if (proc == nullptr) return;
   #if defined(EXE_INCLUDES)
   if (IsX86Process(GetCurrentProcess()) != IsX86Process(proc)) {
-    std::string exe; std::string tmp = EnvironmentGetVariable("TMP");
-    if (IsX86Process(proc)) { exe = tmp + "\\crossprocess32.exe"; } 
-    else { exe = tmp + "\\crossprocess64.exe"; }
+    if (proc == nullptr) return;
+    std::string exe; std::string tmp;
+    wchar_t tempPath[MAX_PATH + 1]; 
+    if (!GetTempPathW(MAX_PATH + 1, tempPath))
+    return; tmp = narrow(tempPath);
+    if (IsX86Process(proc)) exe = tmp + "\\crossprocess32.exe";
+    else exe = tmp + "\\crossprocess64.exe";
     std::wstring wexe = widen(exe);
     if (!PathFileExistsW(wexe.c_str())) {
       FILE *file = nullptr;
@@ -841,27 +852,27 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
     }
   } else {
   #endif
-    wchar_t *wenviron = nullptr;
-    CwdCmdEnvFromProc(proc, &wenviron, MEMENV);
-    int j = 0; if (wenviron) {
-      while (wenviron[j] != L'\0') {
-        EnvironVec1.push_back(narrow(&wenviron[j])); i++;
-        j += wcslen(wenviron + j) + 1;
+    wchar_t *wenv = nullptr;
+    CwdCmdEnvFromProc(proc, &wenv, MEMENV);
+    int j = 0; if (wenv) {
+      while (wenv[j] != L'\0') {
+        EnvironVec1.push_back(narrow(&wenv[j])); i++;
+        j += wcslen(wenv + j) + 1;
       }
-      delete[] wenviron;
+      delete[] wenv;
     }
   #if defined(EXE_INCLUDES)
   }
   #endif
   CloseHandle(proc);
   #elif (defined(__APPLE__) && defined(__MACH__))
-  char **environ = nullptr; int envsiz;
-  CmdEnvFromProcId(procId, &environ, &envsiz, MEMENV);
-  if (environ) {
+  char **env = nullptr; int envsiz;
+  CmdEnvFromProcId(procId, &env, &envsiz, MEMENV);
+  if (env) {
     for (int j = 0; j < envsiz; j++) {
-      EnvironVec1.push_back(environ[i]); i++;
+      EnvironVec1.push_back(env[i]); i++;
     }
-    delete[] environ;
+    delete[] env;
   }
   #elif (defined(__linux__) && !defined(__ANDROID__))
   PROCTAB *proc = openproc(PROC_FILLENV | PROC_PID, &procId);
@@ -877,10 +888,10 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   if (proc_stat) {
     kinfo_proc *proc_info = procstat_getprocs(proc_stat, KERN_PROC_PID, procId, &cntp);
     if (proc_info) {
-      char **environ = procstat_getenvv(proc_stat, proc_info, 0);
-      if (environ) {
-        for (int j = 0; environ[j]; j++) {
-          EnvironVec1.push_back(environ[j]); i++;
+      char **env = procstat_getenvv(proc_stat, proc_info, 0);
+      if (env) {
+        for (int j = 0; env[j]; j++) {
+          EnvironVec1.push_back(env[j]); i++;
         }
         procstat_freeenvv(proc_stat);
       }
