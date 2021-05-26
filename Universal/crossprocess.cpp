@@ -94,6 +94,8 @@ enum MEMTYP {
   MEMCWD
 };
 
+#include <pshpack8.h>
+
 /* RTL_DRIVE_LETTER_CURDIR struct from:
  https://github.com/processhacker/phnt/ 
  CC BY 4.0 licence */
@@ -149,6 +151,8 @@ enum MEMTYP {
   ULONG_PTR DefaultThreadpoolCpuSetMasks;\
   ULONG DefaultThreadpoolCpuSetMaskCount;\
 }
+
+#include <poppack.h>
 
 std::wstring widen(std::string str) {
   std::size_t wchar_count = str.size() + 1;
