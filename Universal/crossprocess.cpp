@@ -94,12 +94,20 @@ enum MEMTYP {
   MEMCWD
 };
 
+/* RTL_DRIVE_LETTER_CURDIR struct from:
+ https://github.com/processhacker/phnt/ 
+ CC BY 4.0 licence */
+
 #define RTL_DRIVE_LETTER_CURDIR struct {\
   USHORT Flags;\
   USHORT Length;\
   ULONG TimeStamp;\
   STRING DosPath;\
 }
+
+/* RTL_USER_PROCESS_PARAMETERS struct from:
+ https://github.com/processhacker/phnt/ 
+ CC BY 4.0 licence */
 
 #define RTL_USER_PROCESS_PARAMETERS struct {\
   ULONG MaximumLength;\
@@ -366,6 +374,12 @@ void ProcIdEnumerate(PROCID **procId, int *size) {
   if (procId) {
     std::copy(vec.begin(), vec.end(), *procId);
     *size = i;
+  }
+}
+
+void FreeProcIds(PROCID *procId) {
+  if (procId) {
+    free(procId);
   }
 }
 
@@ -655,7 +669,9 @@ void CwdFromProcId(PROCID procId, char **buffer) {
 }
 
 void FreeCmdline(char **buffer) {
-  delete[] buffer;
+  if (buffer) {
+    delete[] buffer;
+  }
 }
 
 static std::vector<std::string> CmdlineVec1;
@@ -817,7 +833,9 @@ bool EnvironmentSetVariable(const char *name, const char *value) {
 }
 
 void FreeEnviron(char **buffer) {
-  delete[] buffer;
+  if (buffer) {
+    delete[] buffer;
+  }
 }
 
 static std::vector<std::string> EnvironVec1; 
@@ -933,6 +951,39 @@ void EnvironFromProcIdEx(PROCID procId, const char *name, char **value) {
       }
     }
     FreeEnviron(buffer);
+  }
+}
+
+PROCINFO *ProcInfoFromProcId(PROCID procId) {
+  if (!ProcIdExists(procId)) return nullptr;
+  char *exe   = nullptr; ExeFromProcId(procId, &exe);
+  char *cwd   = nullptr; CwdFromProcId(procId, &cwd);
+  PROCID ppid; ParentProcIdFromProcId(procId, &ppid);
+  PROCID *pid = nullptr; int pidsize; 
+  ProcIdFromParentProcId(procId, &pid, &pidsize);
+  char **cmd  = nullptr; int cmdsize; 
+  CmdlineFromProcId(procId, &cmd, &cmdsize);
+  char **env  = nullptr; int envsize; 
+  EnvironFromProcId(procId, &env, &envsize);
+  PROCINFO *procInfo = new PROCINFO();
+  procInfo->ExecutableImageFilePath = exe;
+  procInfo->CurrentWorkingDirectory = cwd;
+  procInfo->ParentProcessId         = ppid;
+  procInfo->ChildProcessId          = pid;
+  procInfo->ChildProcessIdLength    = pidsize;
+  procInfo->CommandLine             = cmd;
+  procInfo->CommandLineLength       = cmdsize;
+  procInfo->Environment             = env;
+  procInfo->EnvironmentLength       = envsize;
+  return procInfo;
+}
+
+void FreeProcInfo(PROCINFO *procInfo) {
+  if (procInfo) {
+    FreeProcIds(procInfo->ChildProcessId);
+    FreeCmdline(procInfo->CommandLine);
+    FreeEnviron(procInfo->Environment);
+    delete procInfo;
   }
 }
 

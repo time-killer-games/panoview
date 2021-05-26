@@ -33,7 +33,20 @@
 
 namespace CrossProcess {
 
+typedef struct {
+  char *ExecutableImageFilePath;
+  char *CurrentWorkingDirectory;
+  PROCID ParentProcessId;
+  PROCID *ChildProcessId;
+  int ChildProcessIdLength;
+  char **CommandLine;
+  int CommandLineLength;
+  char **Environment;
+  int EnvironmentLength;
+} PROCINFO;
+
 void ProcIdEnumerate(PROCID **procId, int *size);
+void FreeProcIds(PROCID *procId);
 void ProcIdFromSelf(PROCID *procId);
 void ParentProcIdFromSelf(PROCID *parentProcId);
 bool ProcIdExists(PROCID procId);
@@ -53,6 +66,8 @@ bool EnvironmentSetVariable(const char *name, const char *value);
 void FreeEnviron(char **buffer);
 void EnvironFromProcId(PROCID procId, char ***buffer, int *size);
 void EnvironFromProcIdEx(PROCID procId, const char *name, char **value);
+PROCINFO *ProcInfoFromProcId(PROCID procId);
+void FreeProcInfo(PROCINFO *procInfo);
 
 } // namespace CrossProcess
 
