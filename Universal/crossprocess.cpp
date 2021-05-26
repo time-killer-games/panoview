@@ -95,8 +95,8 @@ enum MEMTYP {
 };
 
 #define RTL_DRIVE_LETTER_CURDIR struct {\
-  WORD Flags;\
-  WORD Length;\
+  USHORT Flags;\
+  USHORT Length;\
   ULONG TimeStamp;\
   STRING DosPath;\
 }
@@ -106,32 +106,40 @@ enum MEMTYP {
   ULONG Length;\
   ULONG Flags;\
   ULONG DebugFlags;\
-  PVOID ConsoleHandle;\
+  HANDLE ConsoleHandle;\
   ULONG ConsoleFlags;\
-  PVOID StdInputHandle;\
-  PVOID StdOutputHandle;\
-  PVOID StdErrorHandle;\
+  HANDLE StandardInput;\
+  HANDLE StandardOutput;\
+  HANDLE StandardError;\
   UNICODE_STRING CurrentDirectoryPath;\
-  PVOID CurrentDirectoryHandle;\
+  HANDLE CurrentDirectoryHandle;\
   UNICODE_STRING DllPath;\
   UNICODE_STRING ImagePathName;\
   UNICODE_STRING CommandLine;\
   PVOID Environment;\
-  ULONG StartingPositionLeft;\
-  ULONG StartingPositionTop;\
-  ULONG Width;\
-  ULONG Height;\
-  ULONG CharWidth;\
-  ULONG CharHeight;\
-  ULONG ConsoleTextAttributes;\
+  ULONG StartingX;\
+  ULONG StartingY;\
+  ULONG CountX;\
+  ULONG CountY;\
+  ULONG CountCharsX;\
+  ULONG CountCharsY;\
+  ULONG FillAttribute;\
   ULONG WindowFlags;\
   ULONG ShowWindowFlags;\
   UNICODE_STRING WindowTitle;\
-  UNICODE_STRING DesktopName;\
+  UNICODE_STRING DesktopInfo;\
   UNICODE_STRING ShellInfo;\
   UNICODE_STRING RuntimeData;\
-  RTL_DRIVE_LETTER_CURDIR DLCurrentDirectory[32];\
-  ULONG EnvironmentSize;\
+  RTL_DRIVE_LETTER_CURDIR CurrentDirectories[32];\
+  ULONG_PTR EnvironmentSize;\
+  ULONG_PTR EnvironmentVersion;\
+  PVOID PackageDependencyData;\
+  ULONG ProcessGroupId;\
+  ULONG LoaderThreads;\
+  UNICODE_STRING RedirectionDllName;\
+  UNICODE_STRING HeapPartitionName;\
+  ULONG_PTR DefaultThreadpoolCpuSetMasks;\
+  ULONG DefaultThreadpoolCpuSetMaskCount;\
 }
 
 std::wstring widen(std::string str) {
