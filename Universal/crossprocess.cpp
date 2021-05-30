@@ -75,6 +75,8 @@
 #include <libutil.h>
 #endif
 
+using CrossProcess::PROCID;
+
 namespace {
 
 std::vector<std::string> StringSplitByFirstEqualsSign(std::string str) {
@@ -959,7 +961,6 @@ void EnvironFromProcIdEx(PROCID procId, const char *name, char **value) {
 }
 
 PROCINFO *ProcInfoFromProcId(PROCID procId) {
-  if (!ProcIdExists(procId)) return nullptr;
   char *exe   = nullptr; ExeFromProcId(procId, &exe);
   char *cwd   = nullptr; CwdFromProcId(procId, &cwd);
   PROCID ppid; ParentProcIdFromProcId(procId, &ppid);
@@ -970,6 +971,7 @@ PROCINFO *ProcInfoFromProcId(PROCID procId) {
   char **env  = nullptr; int envsize; 
   EnvironFromProcId(procId, &env, &envsize);
   PROCINFO *procInfo = new PROCINFO();
+  procInfo->ProcessId               = procId;
   procInfo->ExecutableImageFilePath = exe;
   procInfo->CurrentWorkingDirectory = cwd;
   procInfo->ParentProcessId         = ppid;
@@ -983,12 +985,10 @@ PROCINFO *ProcInfoFromProcId(PROCID procId) {
 }
 
 void FreeProcInfo(PROCINFO *procInfo) {
-  if (procInfo) {
-    FreeProcIds(procInfo->ChildProcessId);
-    FreeCmdline(procInfo->CommandLine);
-    FreeEnviron(procInfo->Environment);
-    delete procInfo;
-  }
+  FreeProcIds(ChildProcessId(procInfo));
+  FreeCmdline(CommandLine(procInfo));
+  FreeEnviron(Environment(procInfo));
+  delete procInfo;
 }
 
 } // namespace CrossProcess

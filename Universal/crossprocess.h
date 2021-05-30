@@ -25,15 +25,15 @@
  
 */
 
-#if !defined(_WIN32)
-#define PROCID int
-#else
-#define PROCID unsigned long
-#endif
-
 namespace CrossProcess {
 
+#if !defined(_WIN32)
+typedef int PROCID;
+#else
+typedef unsigned long PROCID;
+#endif
 typedef struct {
+  PROCID ProcessId;
   char *ExecutableImageFilePath;
   char *CurrentWorkingDirectory;
   PROCID ParentProcessId;
@@ -68,6 +68,20 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size);
 void EnvironFromProcIdEx(PROCID procId, const char *name, char **value);
 PROCINFO *ProcInfoFromProcId(PROCID procId);
 void FreeProcInfo(PROCINFO *procInfo);
+
+inline PROCID ProcessId(PROCINFO *procInfo) { return procInfo->ProcessId; }
+inline char *ExecutableImageFilePath(PROCINFO *procInfo) { return procInfo->ExecutableImageFilePath; }
+inline char *CurrentWorkingDirectory(PROCINFO *procInfo) { return procInfo->CurrentWorkingDirectory; }
+inline PROCID ParentProcessId(PROCINFO *procInfo) { return procInfo->ParentProcessId; }
+inline PROCID *ChildProcessId(PROCINFO *procInfo) { return procInfo->ChildProcessId; }
+inline PROCID ChildProcessId(PROCINFO *procInfo, int i) { return procInfo->ChildProcessId[i]; }
+inline int ChildProcessIdLength(PROCINFO *procInfo) { return procInfo->ChildProcessIdLength; }
+inline char **CommandLine(PROCINFO *procInfo) { return procInfo->CommandLine; }
+inline char *CommandLine(PROCINFO *procInfo, int i) { return procInfo->CommandLine[i]; }
+inline int CommandLineLength(PROCINFO *procInfo) { return procInfo->CommandLineLength; }
+inline char **Environment(PROCINFO *procInfo) { return procInfo->Environment; }
+inline char *Environment(PROCINFO *procInfo, int i) { return procInfo->Environment[i]; }
+inline int EnvironmentLength(PROCINFO *procInfo) { return procInfo->EnvironmentLength; }
 
 } // namespace CrossProcess
 
