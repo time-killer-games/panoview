@@ -548,6 +548,7 @@ int main(int argc, char **argv) {
   string exefile; char *exe = nullptr;
   CrossProcess::ProcIdFromSelf(&pid);
   CrossProcess::ExeFromProcId(pid, &exe);
+  exefile = exe;
 
   if (exefile.find_last_of("/\\") != string::npos)
   cwd = exefile.substr(0, exefile.find_last_of("/\\"));
