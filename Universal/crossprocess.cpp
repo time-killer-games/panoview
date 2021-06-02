@@ -41,19 +41,18 @@
 #include <cstdio>
 
 #include "crossprocess.h"
-#if defined(EXE_INCLUDES)
+#if defined(XPROCESS_WIN32EXE_INCLUDES)
 #include "crossprocess32.h"
 #include "crossprocess64.h"
 #endif
 
 #if !defined(_WIN32)
-#include <sys/types.h>
 #include <signal.h>
 #include <unistd.h>
+#include <sys/types.h>
 #endif
 
 #if defined(_WIN32)
-#include <windows.h>
 #include <shlwapi.h>
 #include <Objbase.h>
 #include <tlhelp32.h>
@@ -76,6 +75,9 @@
 #endif
 
 using CrossProcess::PROCID;
+#if defined(XPROCESS_GUIWINDOW_IMPL)
+using CrossProcess::WINDOWID;
+#endif
 
 namespace {
 
@@ -193,7 +195,7 @@ BOOL IsX86Process(HANDLE proc) {
   return isWow;
 }
 
-#if defined(EXE_INCLUDES)
+#if defined(XPROCESS_WIN32EXE_INCLUDES)
 void ReadProcessOuputThread(HANDLE handle, std::string *output) {
   std::string result;
   DWORD dwRead = 0;
@@ -356,7 +358,7 @@ void ProcIdEnumerate(PROCID **procId, int *size) {
   std::vector<PROCID> proc_info(cntp);
   std::fill(proc_info.begin(), proc_info.end(), 0);
   proc_listpids(PROC_ALL_PIDS, 0, &proc_info[0], sizeof(PROCID) * cntp);
-  for (int j = cntp; j > 0; j--) {
+  for (int j = cntp - 1; j >= 0; j--) {
     if (proc_info[j] == 0) { continue; }
     vec.push_back(proc_info[j]); i++;
   }
@@ -383,7 +385,7 @@ void ProcIdEnumerate(PROCID **procId, int *size) {
   }
 }
 
-void FreeProcIds(PROCID *procId) {
+void FreeProcId(PROCID *procId) {
   if (procId) {
     free(procId);
   }
@@ -492,7 +494,7 @@ void ProcIdFromParentProcId(PROCID parentProcId, PROCID **procId, int *size) {
   std::vector<PROCID> proc_info(cntp);
   std::fill(proc_info.begin(), proc_info.end(), 0);
   proc_listpids(PROC_ALL_PIDS, 0, &proc_info[0], sizeof(PROCID) * cntp);
-  for (int j = cntp; j > 0; j--) {
+  for (int j = cntp - 1; j >= 0; j--) {
     if (proc_info[j] == 0) { continue; }
     PROCID ppid; ParentProcIdFromProcId(proc_info[j], &ppid);
     if (ppid == parentProcId) {
@@ -596,7 +598,7 @@ void CwdFromProcId(PROCID procId, char **buffer) {
   #if defined(_WIN32)
   HANDLE proc = OpenProcessWithDebugPrivilege(procId);
   if (proc == nullptr) return;
-  #if defined(EXE_INCLUDES)
+  #if defined(XPROCESS_WIN32EXE_INCLUDES)
   if (IsX86Process(GetCurrentProcess()) != IsX86Process(proc)) {
     std::string exe; std::string tmp;
     wchar_t tempPath[MAX_PATH + 1]; 
@@ -630,7 +632,7 @@ void CwdFromProcId(PROCID procId, char **buffer) {
       *buffer = (char *)str.c_str();
       delete[] cwdbuf;
     }
-  #if defined(EXE_INCLUDES)
+  #if defined(XPROCESS_WIN32EXE_INCLUDES)
   }
   #endif
   CloseHandle(proc);
@@ -687,7 +689,7 @@ void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
   #if defined(_WIN32)
   HANDLE proc = OpenProcessWithDebugPrivilege(procId);
   if (proc == nullptr) return;
-  #if defined(EXE_INCLUDES)
+  #if defined(XPROCESS_WIN32EXE_INCLUDES)
   if (IsX86Process(GetCurrentProcess()) != IsX86Process(proc)) {
     if (proc == nullptr) return;
     std::string exe; std::string tmp;
@@ -732,7 +734,7 @@ void CmdlineFromProcId(PROCID procId, char ***buffer, int *size) {
       }
       delete[] cmdbuf;
     }
-  #if defined(EXE_INCLUDES)
+  #if defined(XPROCESS_WIN32EXE_INCLUDES)
   }
   #endif
   CloseHandle(proc);
@@ -851,7 +853,7 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
   #if defined(_WIN32)
   HANDLE proc = OpenProcessWithDebugPrivilege(procId);
   if (proc == nullptr) return;
-  #if defined(EXE_INCLUDES)
+  #if defined(XPROCESS_WIN32EXE_INCLUDES)
   if (IsX86Process(GetCurrentProcess()) != IsX86Process(proc)) {
     if (proc == nullptr) return;
     std::string exe; std::string tmp;
@@ -893,7 +895,7 @@ void EnvironFromProcId(PROCID procId, char ***buffer, int *size) {
       }
       delete[] wenv;
     }
-  #if defined(EXE_INCLUDES)
+  #if defined(XPROCESS_WIN32EXE_INCLUDES)
   }
   #endif
   CloseHandle(proc);
@@ -960,17 +962,254 @@ void EnvironFromProcIdEx(PROCID procId, const char *name, char **value) {
   }
 }
 
-PROCINFO *ProcInfoFromProcId(PROCID procId) {
-  char *exe   = nullptr; ExeFromProcId(procId, &exe);
-  char *cwd   = nullptr; CwdFromProcId(procId, &cwd);
-  PROCID ppid; ParentProcIdFromProcId(procId, &ppid);
+#if defined(XPROCESS_GUIWINDOW_IMPL)
+#if (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__) || defined(XPROCESS_XQUARTZ_IMPL)
+static inline int XErrorHandlerImpl(Display *display, XErrorEvent *event) {
+  return 0;
+}
+
+static inline int XIOErrorHandlerImpl(Display *display) {
+  return 0;
+}
+
+static inline void SetErrorHandlers() {
+  XSetErrorHandler(XErrorHandlerImpl);
+  XSetIOErrorHandler(XIOErrorHandlerImpl);
+}
+#endif
+
+WINDOWID WindowIdFromNativeWindow(WINDOW window) {
+  static std::string wid; 
+  #if defined(_WIN32)
+  const void *address = static_cast<const void *>(window);
+  std::stringstream ss; ss << address;  
+  wid = ss.str();
+  #else 
+  wid = std::to_string((unsigned long)window);
+  #endif
+  return (WINDOWID)wid.c_str();
+}
+
+WINDOW NativeWindowFromWindowId(WINDOWID winId) {
+  #if defined(_WIN32)
+  void *address; sscanf(winId, "%p", &address);
+  WINDOW window = (WINDOW)address;
+  #else
+  WINDOW window = (WINDOW)strtoull(winId, nullptr, 10);
+  #endif
+  return window;
+}
+
+static std::vector<std::string> widVec1;
+void WindowIdFromProcId(PROCID procId, WINDOWID **winId, int *size) {
+  if (!ProcIdExists(procId)) return;
+  widVec1.clear(); int i = 0;
+  #if defined(_WIN32)
+  HWND hWnd = GetTopWindow(GetDesktopWindow());
+  const void *address = static_cast<const void *>(hWnd);
+  std::stringstream ss; ss << address; 
+  PROCID pid; ProcIdFromWindowId((WINDOWID)ss.str().c_str(), &pid);
+  if (procId == pid) {  
+    widVec1.push_back(ss.str()); i++; 
+  }
+  while (hWnd = GetWindow(hWnd, GW_HWNDNEXT)) {
+    const void *address = static_cast<const void *>(hWnd);
+    std::stringstream ss; ss << address; 
+    PROCID pid; ProcIdFromWindowId((WINDOWID)ss.str().c_str(), &pid);
+    if (procId == pid) {  
+      widVec1.push_back(ss.str()); i++; 
+    }
+  }
+  #elif (defined(__APPLE__) && defined(__MACH__)) && !defined(XPROCESS_XQUARTZ_IMPL)
+  CFArrayRef windowArray = CGWindowListCopyWindowInfo(
+  kCGWindowListOptionAll, kCGNullWindowID);
+  CFIndex windowCount = 0;
+  if ((windowCount = CFArrayGetCount(windowArray))) {
+    for (CFIndex j = 0; j < windowCount; j++) {
+      CFDictionaryRef windowInfoDictionary = 
+      (CFDictionaryRef)CFArrayGetValueAtIndex(windowArray, j);
+      CFNumberRef ownerPID = (CFNumberRef)CFDictionaryGetValue(
+      windowInfoDictionary, kCGWindowOwnerPID); PROCID pid;
+      CFNumberGetValue(ownerPID, kCFNumberIntType, &pid);
+      if (procId == pid) {
+        CFNumberRef windowID = (CFNumberRef)CFDictionaryGetValue(
+        windowInfoDictionary, kCGWindowNumber);
+        CGWindowID wid; CFNumberGetValue(windowID,
+        kCGWindowIDCFNumberType, &wid);
+        widVec1.push_back(std::to_string((unsigned long)wid)); i++;
+      }
+    }
+  }
+  CFRelease(windowArray);
+  #elif (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__) || defined(XPROCESS_XQUARTZ_IMPL)
+  SetErrorHandlers();
+  Display *display = XOpenDisplay(nullptr);
+  Window window = XDefaultRootWindow(display);
+  unsigned char *prop = nullptr;
+  Atom actual_type, filter_atom;
+  int actual_format, status;
+  unsigned long nitems, bytes_after;
+  filter_atom = XInternAtom(display, "_NET_CLIENT_LIST_STACKING", true);
+  status = XGetWindowProperty(display, window, filter_atom, 0, 1024, false,
+  AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, &prop);
+  if (status == Success && prop != nullptr && nitems) {
+    if (actual_format == 32) {
+      unsigned long *array = (unsigned long *)prop;
+      for (int j = nitems - 1; j >= 0; j--) {
+        PROCID pid; ProcIdFromWindowId(WindowIdFromNativeWindow(array[j]), &pid);
+        if (procId == pid) {
+          widVec1.push_back(std::to_string(array[j])); i++;
+        }
+      }
+    }
+    XFree(prop);
+  }
+  XCloseDisplay(display);
+  #endif
+  std::vector<WINDOWID> widVec2;
+  #if !defined(_WIN32)
+  for (int i = 0; i < widVec1.size(); i++) {
+  #else
+  for (int i = widVec1.size() - 1; i >= 0; i--) {
+  #endif
+    widVec2.push_back((WINDOWID)widVec1[i].c_str());
+  }
+  WINDOWID *arr = new WINDOWID[widVec2.size()]();
+  std::copy(widVec2.begin(), widVec2.end(), arr);
+  *winId = arr; *size = i;
+}
+
+void FreeWindowId(WINDOWID *winId) {
+  if (winId) {
+    delete[] winId;
+  }
+}
+
+static std::vector<std::string> widVec3;
+void WindowIdEnumerate(WINDOWID **winId, int *size) {
+  widVec3.clear(); int i = 0;
   PROCID *pid = nullptr; int pidsize; 
+  ProcIdEnumerate(&pid, &pidsize);
+  if (pid) {
+    for (int j = 0; j < pidsize; j++) {
+      WINDOWID *wid = nullptr; int widsize;
+      WindowIdFromProcId(pid[j], &wid, &widsize);
+      if (wid) {
+        for (int ii = 0; ii < widsize; ii++) {
+          widVec3.push_back(wid[ii]); i++;
+        }
+        FreeWindowId(wid);
+      }
+    }
+  }
+  std::vector<WINDOWID> widVec4;
+  for (int i = 0; i < widVec3.size(); i++)
+    widVec4.push_back((WINDOWID)widVec3[i].c_str());
+  WINDOWID *arr = new WINDOWID[widVec4.size()]();
+  std::copy(widVec4.begin(), widVec4.end(), arr);
+  *winId = arr; *size = i;
+}
+
+void ProcIdFromWindowId(WINDOWID winId, PROCID *procId) {
+  #if defined(_WIN32)
+  DWORD pid; GetWindowThreadProcessId(NativeWindowFromWindowId(winId), &pid);
+  *procId = (PROCID)pid;
+  #elif (defined(__APPLE__) && defined(__MACH__)) && !defined(XPROCESS_XQUARTZ_IMPL)
+  CFArrayRef windowArray = CGWindowListCopyWindowInfo(
+  kCGWindowListOptionAll, kCGNullWindowID);
+  CFIndex windowCount = 0;
+  if ((windowCount = CFArrayGetCount(windowArray))) {
+    for (CFIndex i = 0; i < windowCount; i++) {
+      CFDictionaryRef windowInfoDictionary = 
+      (CFDictionaryRef)CFArrayGetValueAtIndex(windowArray, i);
+      CFNumberRef ownerPID = (CFNumberRef)CFDictionaryGetValue(
+      windowInfoDictionary, kCGWindowOwnerPID); PROCID pid;
+      CFNumberGetValue(ownerPID, kCFNumberIntType, &pid);
+      WINDOWID *wid = nullptr; int size; 
+      WindowIdFromProcId(pid, &wid, &size);
+      if (wid) {
+        for (int j = 0; j < size; j++) {
+          if (strtoul(winId, nullptr, 10) == strtoul(wid[j], nullptr, 10)) {
+            *procId = pid;
+            break;
+          }
+        }
+        FreeWindowId(wid);
+      }      
+    }
+  }
+  CFRelease(windowArray);
+  #elif (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__) || defined(XPROCESS_XQUARTZ_IMPL)
+  SetErrorHandlers();
+  Display *display = XOpenDisplay(nullptr);
+  unsigned long property;
+  unsigned char *prop = nullptr;
+  Atom actual_type, filter_atom;
+  int actual_format, status;
+  unsigned long nitems, bytes_after;
+  filter_atom = XInternAtom(display, "_NET_WM_PID", true);
+  status = XGetWindowProperty(display, NativeWindowFromWindowId(winId), filter_atom, 0, 1000, false,
+  AnyPropertyType, &actual_type, &actual_format, &nitems, &bytes_after, &prop);
+  if (status == Success && prop != nullptr) {
+    property = prop[0] + (prop[1] << 8) + (prop[2] << 16) + (prop[3] << 24);
+    XFree(prop);
+  }
+  *procId = (PROCID)property;
+  XCloseDisplay(display);
+  #endif
+  if (!ProcIdExists(*procId)) {
+    *procId = 0;
+  }
+}
+
+bool WindowIdExists(WINDOWID winId) {
+  PROCID procId;
+  ProcIdFromWindowId(winId, &procId);
+  if (procId) {
+    return ProcIdExists(procId);
+  }
+  return false;
+}
+
+bool WindowIdKill(WINDOWID winId) {
+  PROCID procId;
+  ProcIdFromWindowId(winId, &procId);
+  if (procId) {
+    return ProcIdKill(procId);
+  }
+  return false;
+}
+#endif
+
+PROCINFO ProcInfoFromInternalProcInfo(_PROCINFO *procInfo) {
+  static std::string res; 
+  const void *address = static_cast<const void *>(procInfo);
+  std::stringstream ss; ss << address;  
+  res = ss.str();
+  return (PROCINFO)res.c_str();
+}
+
+_PROCINFO *InternalProcInfoFromProcInfo(PROCINFO procInfo) {
+  void *address; sscanf(procInfo, "%p", &address);
+  _PROCINFO *res = (_PROCINFO *)address;
+  return res;
+}
+
+_PROCINFO *InternalProcInfoFromProcId(PROCID procId) {
+  char *exe    = nullptr; ExeFromProcId(procId, &exe);
+  char *cwd    = nullptr; CwdFromProcId(procId, &cwd);
+  PROCID ppid; ParentProcIdFromProcId(procId, &ppid);
+  PROCID *pid  = nullptr; int pidsize; 
   ProcIdFromParentProcId(procId, &pid, &pidsize);
-  char **cmd  = nullptr; int cmdsize; 
+  char **cmd   = nullptr; int cmdsize; 
   CmdlineFromProcId(procId, &cmd, &cmdsize);
-  char **env  = nullptr; int envsize; 
+  char **env   = nullptr; int envsize; 
   EnvironFromProcId(procId, &env, &envsize);
-  PROCINFO *procInfo = new PROCINFO();
+  #if defined(XPROCESS_GUIWINDOW_IMPL)
+  WINDOWID *wid = nullptr; int widsize;
+  WindowIdFromProcId(procId, &wid, &widsize);
+  #endif
+  _PROCINFO *procInfo = new _PROCINFO();
   procInfo->ProcessId               = procId;
   procInfo->ExecutableImageFilePath = exe;
   procInfo->CurrentWorkingDirectory = cwd;
@@ -981,20 +1220,35 @@ PROCINFO *ProcInfoFromProcId(PROCID procId) {
   procInfo->CommandLineLength       = cmdsize;
   procInfo->Environment             = env;
   procInfo->EnvironmentLength       = envsize;
+  #if defined(XPROCESS_GUIWINDOW_IMPL)
+  procInfo->OwnedWindowId           = wid;
+  procInfo->OwnedWindowIdLength     = widsize;
+  #endif
   return procInfo;
 }
 
-void FreeProcInfo(PROCINFO *procInfo) {
-  FreeProcIds(ChildProcessId(procInfo));
-  FreeCmdline(CommandLine(procInfo));
-  FreeEnviron(Environment(procInfo));
+PROCINFO ProcInfoFromProcId(PROCID procId) {
+  return ProcInfoFromInternalProcInfo(InternalProcInfoFromProcId(procId));
+}
+
+void FreeInternalProcInfo(_PROCINFO *procInfo) {
+  FreeProcId(procInfo->ChildProcessId);
+  FreeCmdline(procInfo->CommandLine);
+  FreeEnviron(procInfo->Environment);
+  #if defined(XPROCESS_GUIWINDOW_IMPL)
+  FreeWindowId(procInfo->OwnedWindowId);
+  #endif
   delete procInfo;
+}
+
+void FreeProcInfo(PROCINFO procInfo) {
+  FreeInternalProcInfo(InternalProcInfoFromProcInfo(procInfo));
 }
 
 } // namespace CrossProcess
 
 #if defined(_WIN32)
-#if !defined(EXE_INCLUDES)
+#if !defined(XPROCESS_WIN32EXE_INCLUDES)
 static std::string StringReplaceAll(std::string str, std::string substr, std::string nstr) {
   std::size_t pos = 0;
   while ((pos = str.find(substr, pos)) != std::string::npos) {

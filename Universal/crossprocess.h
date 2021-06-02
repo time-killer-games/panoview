@@ -25,6 +25,19 @@
  
 */
 
+#if defined(XPROCESS_GUIWINDOW_IMPL)
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#if (defined(__APPLE__) && defined(__MACH__)) && !defined(XPROCESS_XQUARTZ_IMPL)
+#include <CoreGraphics/CoreGraphics.h>
+#include <CoreFoundation/CoreFoundation.h>
+#elif (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__) || defined(XPROCESS_XQUARTZ_IMPL)
+#include <X11/Xlib.h>
+#endif
+#endif
+#endif
+
 namespace CrossProcess {
 
 #if !defined(_WIN32)
@@ -32,6 +45,17 @@ typedef int PROCID;
 #else
 typedef unsigned long PROCID;
 #endif
+#if defined(XPROCESS_GUIWINDOW_IMPL)
+#if defined(_WIN32)
+typedef HWND WINDOW;
+#elif (defined(__APPLE__) && defined(__MACH__)) && !defined(XPROCESS_XQUARTZ_IMPL)
+typedef CGWindowID WINDOW;
+#elif (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__) || defined(XPROCESS_XQUARTZ_IMPL)
+typedef Window WINDOW;
+#endif
+typedef char *WINDOWID;
+#endif
+typedef char *PROCINFO;
 typedef struct {
   PROCID ProcessId;
   char *ExecutableImageFilePath;
@@ -43,10 +67,14 @@ typedef struct {
   int CommandLineLength;
   char **Environment;
   int EnvironmentLength;
-} PROCINFO;
+  #if defined(XPROCESS_GUIWINDOW_IMPL)
+  WINDOWID *OwnedWindowId;
+  int OwnedWindowIdLength;
+  #endif
+} _PROCINFO;
 
 void ProcIdEnumerate(PROCID **procId, int *size);
-void FreeProcIds(PROCID *procId);
+void FreeProcId(PROCID *procId);
 void ProcIdFromSelf(PROCID *procId);
 void ParentProcIdFromSelf(PROCID *parentProcId);
 bool ProcIdExists(PROCID procId);
@@ -66,22 +94,41 @@ bool EnvironmentSetVariable(const char *name, const char *value);
 void FreeEnviron(char **buffer);
 void EnvironFromProcId(PROCID procId, char ***buffer, int *size);
 void EnvironFromProcIdEx(PROCID procId, const char *name, char **value);
-PROCINFO *ProcInfoFromProcId(PROCID procId);
-void FreeProcInfo(PROCINFO *procInfo);
+ PROCINFO  ProcInfoFromInternalProcInfo(_PROCINFO *procInfo);
+_PROCINFO *InternalProcInfoFromProcInfo( PROCINFO  procInfo);
+ PROCINFO ProcInfoFromProcId(PROCID procId);
+_PROCINFO *InternalProcInfoFromProcId(PROCID procId);
+void FreeProcInfo(PROCINFO procInfo);
+void FreeInternalProcInfo(_PROCINFO *procInfo);
+#if defined(XPROCESS_GUIWINDOW_IMPL)
+WINDOWID WindowIdFromNativeWindow(WINDOW window);
+WINDOW NativeWindowFromWindowId(WINDOWID winid);
+void WindowIdEnumerate(WINDOWID **winId, int *size);
+void ProcIdFromWindowId(WINDOWID winId, PROCID *procId);
+void WindowIdFromProcId(PROCID procId, WINDOWID **winId, int *size);
+void FreeWindowId(WINDOWID *winId);
+bool WindowIdExists(WINDOWID winId);
+bool WindowIdKill(WINDOWID winId);
+#endif
 
-inline PROCID ProcessId(PROCINFO *procInfo) { return procInfo->ProcessId; }
-inline char *ExecutableImageFilePath(PROCINFO *procInfo) { return procInfo->ExecutableImageFilePath; }
-inline char *CurrentWorkingDirectory(PROCINFO *procInfo) { return procInfo->CurrentWorkingDirectory; }
-inline PROCID ParentProcessId(PROCINFO *procInfo) { return procInfo->ParentProcessId; }
-inline PROCID *ChildProcessId(PROCINFO *procInfo) { return procInfo->ChildProcessId; }
-inline PROCID ChildProcessId(PROCINFO *procInfo, int i) { return procInfo->ChildProcessId[i]; }
-inline int ChildProcessIdLength(PROCINFO *procInfo) { return procInfo->ChildProcessIdLength; }
-inline char **CommandLine(PROCINFO *procInfo) { return procInfo->CommandLine; }
-inline char *CommandLine(PROCINFO *procInfo, int i) { return procInfo->CommandLine[i]; }
-inline int CommandLineLength(PROCINFO *procInfo) { return procInfo->CommandLineLength; }
-inline char **Environment(PROCINFO *procInfo) { return procInfo->Environment; }
-inline char *Environment(PROCINFO *procInfo, int i) { return procInfo->Environment[i]; }
-inline int EnvironmentLength(PROCINFO *procInfo) { return procInfo->EnvironmentLength; }
+inline PROCID ProcessId(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->ProcessId; }
+inline char *ExecutableImageFilePath(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->ExecutableImageFilePath; }
+inline char *CurrentWorkingDirectory(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->CurrentWorkingDirectory; }
+inline PROCID ParentProcessId(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->ParentProcessId; }
+inline PROCID *ChildProcessId(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->ChildProcessId; }
+inline PROCID ChildProcessId(PROCINFO procInfo, int i) { return InternalProcInfoFromProcInfo(procInfo)->ChildProcessId[i]; }
+inline int ChildProcessIdLength(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->ChildProcessIdLength; }
+inline char **CommandLine(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->CommandLine; }
+inline char *CommandLine(PROCINFO procInfo, int i) { return InternalProcInfoFromProcInfo(procInfo)->CommandLine[i]; }
+inline int CommandLineLength(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->CommandLineLength; }
+inline char **Environment(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->Environment; }
+inline char *Environment(PROCINFO procInfo, int i) { return InternalProcInfoFromProcInfo(procInfo)->Environment[i]; }
+inline int EnvironmentLength(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->EnvironmentLength; }
+#if defined(XPROCESS_GUIWINDOW_IMPL)
+inline WINDOWID *OwnedWindowId(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->OwnedWindowId; }
+inline WINDOWID OwnedWindowId(PROCINFO procInfo, int i) { return InternalProcInfoFromProcInfo(procInfo)->OwnedWindowId[i]; }
+inline int OwnedWindowIdLength(PROCINFO procInfo) { return InternalProcInfoFromProcInfo(procInfo)->OwnedWindowIdLength; }
+#endif
 
 } // namespace CrossProcess
 

@@ -96,7 +96,7 @@ typedef string wid_t;
 namespace {
 
 string cwd;
-wid_t WindowID  = "-1"; 
+wid_t windowId  = "-1"; 
 const double PI = 3.141592653589793;
 
 #if defined(_WIN32)
@@ -527,34 +527,17 @@ int main(int argc, char **argv) {
   #if defined(_WIN32)
   HWND handle = WindowFromDC(wglGetCurrentDC());
   ShowWindow(handle, SW_HIDE);
-  WindowID = std::to_string((std::uintptr_t)handle);
-  std::cout << "Window ID: " << WindowID << std::endl;
+  windowId = std::to_string((std::uintptr_t)handle);
+  std::cout << "Window ID: " << windowId << std::endl;
   #elif (defined(__APPLE__) && defined(__MACH__))
-  CFArrayRef windowArray = CGWindowListCopyWindowInfo(
-  kCGWindowListOptionAll, kCGNullWindowID);
-  CFIndex windowCount = 0;
-  if ((windowCount = CFArrayGetCount(windowArray))) {
-    for (CFIndex i = 0; i < windowCount; i++) {
-      CFDictionaryRef windowInfoDictionary = 
-      (CFDictionaryRef)CFArrayGetValueAtIndex(windowArray, i);
-      CFNumberRef ownerPID = (CFNumberRef)CFDictionaryGetValue(
-      windowInfoDictionary, kCGWindowOwnerPID);
-      PROCID pid; CFNumberGetValue(ownerPID, kCFNumberIntType, &pid);
-      if (getpid() == pid) {
-        CFNumberRef windowID = (CFNumberRef)CFDictionaryGetValue(
-        windowInfoDictionary, kCGWindowNumber);
-        CGWindowID CoreGraphicsWindowID; CFNumberGetValue(windowID, 
-        kCGWindowIDCFNumberType, &CoreGraphicsWindowID);
-        WindowID = std::to_string((std::uintptr_t)CoreGraphicsWindowID);
-        std::cout << "Window ID: " << WindowID << std::endl;
-        break;
-      }
-    }
-  }
-  CFRelease(windowArray);
+  CGWindowID *wid; int widsize;
+  CrossProcess::WindowIdFromProcId(getpid(), &wid, &widsize);
+  if (wid) { if (widsize) { windowId = std::to_string((std::uintptr_t)wid[0]);
+  std::cout << "Window ID: " << windowId << std::endl; } 
+  CrossProcess::FreeWindowId(wid); }
   #elif (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__)
-  WindowID = std::to_string((std::uintptr_t)glXGetCurrentDrawable());
-  std::cout << "Window ID: " << WindowID << std::endl;
+  windowId = std::to_string((std::uintptr_t)glXGetCurrentDrawable());
+  std::cout << "Window ID: " << windowId << std::endl;
   #endif
 
   glutDisplayFunc(display);
