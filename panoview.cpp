@@ -530,9 +530,9 @@ int main(int argc, char **argv) {
   windowId = std::to_string((std::uintptr_t)handle);
   std::cout << "Window ID: " << windowId << std::endl;
   #elif (defined(__APPLE__) && defined(__MACH__))
-  CGWindowID *wid; int widsize;
+  CrossProcess::WINDOWID *wid; int widsize;
   CrossProcess::WindowIdFromProcId(getpid(), &wid, &widsize);
-  if (wid) { if (widsize) { windowId = std::to_string((std::uintptr_t)wid[0]);
+  if (wid) { if (widsize) { windowId = wid[0];
   std::cout << "Window ID: " << windowId << std::endl; } 
   CrossProcess::FreeWindowId(wid); }
   #elif (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__)
@@ -544,36 +544,10 @@ int main(int argc, char **argv) {
   glutHideWindow();
   glClearColor(0, 0, 0, 1);
 
-  string exefile;
-  #if defined(_WIN32)
-  wchar_t exe[MAX_PATH];
-  if (GetModuleFileNameW(nullptr, exe, MAX_PATH)) {
-    exefile = narrow(exe);
-  }
-  #elif (defined(__APPLE__) && defined(__MACH__))
-  char exe[PROC_PIDPATHINFO_MAXSIZE];
-  if (proc_pidpath(getpid(), exe, sizeof(exe)) > 0) {
-    exefile = exe;
-  }
-  #elif (defined(__linux__) && !defined(__ANDROID__))
-  char exe[PATH_MAX]; 
-  if (realpath("/proc/self/exe", exe)) {
-    exefile = exe;
-  }
-  #elif defined(__FreeBSD__)
-  int mib[4]; size_t s;
-  mib[0] = CTL_KERN;
-  mib[1] = KERN_PROC;
-  mib[2] = KERN_PROC_PATHNAME;
-  mib[3] = -1;
-  if (sysctl(mib, 4, nullptr, &s, nullptr, 0) == 0) {
-    string str1; str1.resize(s, '\0');
-    char *exe = str1.data();
-    if (sysctl(mib, 4, exe, &s, nullptr, 0) == 0) {
-      exefile = exe;
-    }
-  }
-  #endif
+  CrossProcess::PROCID pid; 
+  string exefile; char *exe = nullptr;
+  CrossProcess::ProcIdFromSelf(&pid);
+  CrossProcess::ExeFromProcId(pid, &exe);
 
   if (exefile.find_last_of("/\\") != string::npos)
   cwd = exefile.substr(0, exefile.find_last_of("/\\"));
