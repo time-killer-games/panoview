@@ -527,7 +527,8 @@ int main(int argc, char **argv) {
   #if defined(_WIN32)
   HWND handle = WindowFromDC(wglGetCurrentDC());
   ShowWindow(handle, SW_HIDE);
-  windowId = std::to_string((std::uintptr_t)handle);
+  const void *address = static_cast<const void *>(handle);
+  std::stringstream ss; ss << address; windowId = ss.str();
   std::cout << "Window ID: " << windowId << std::endl;
   #elif (defined(__APPLE__) && defined(__MACH__))
   CrossProcess::WINDOWID *wid; int widsize;
@@ -536,7 +537,7 @@ int main(int argc, char **argv) {
   std::cout << "Window ID: " << windowId << std::endl; } 
   CrossProcess::FreeWindowId(wid); }
   #elif (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__)
-  windowId = std::to_string((std::uintptr_t)glXGetCurrentDrawable());
+  windowId = std::to_string((unsigned long)glXGetCurrentDrawable());
   std::cout << "Window ID: " << windowId << std::endl;
   #endif
 
