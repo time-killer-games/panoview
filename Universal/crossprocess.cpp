@@ -953,8 +953,7 @@ WINDOWID WindowIdFromNativeWindow(WINDOW window) {
 }
 
 WINDOW NativeWindowFromWindowId(WINDOWID winId) {
-  WINDOW res = (WINDOW)strtoull(winId, nullptr, 10);
-  return res;
+  return (WINDOW)strtoull(winId, nullptr, 10);
 }
 
 static std::vector<std::string> widVec1;
