@@ -1193,9 +1193,10 @@ PROCLIST ProcListCreate() {
     std::vector<PROCID> res;
     for (int i = 0; i < size; i++)
       res.push_back(procId[i]); 
-    procListVec.push_back(res); procListIndex++;
+    procListVec.push_back(res);
     FreeProcId(procId);
   }
+  procListIndex++;
   return procListIndex;
 }
 
