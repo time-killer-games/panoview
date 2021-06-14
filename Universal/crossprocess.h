@@ -154,6 +154,5 @@ void FreeExecutedProcessStandardInput(PROCESS procIndex);
 void FreeExecutedProcessStandardOutput(PROCESS procIndex);
 bool CompletionStatusFromExecutedProcess(PROCESS procIndex);
 
-
 } // namespace CrossProcess
 
