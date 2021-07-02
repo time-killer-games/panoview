@@ -16,4 +16,5 @@ else
   rm -f "crossprocess32.exe" "crossprocess64.exe"
   cd ".."
   g++ panoview.cpp Universal/crossprocess.cpp Win32/libpng-util.cpp Win32/dlgmodule.cpp -DXPROCESS_WIN32EXE_INCLUDES -DFREEGLUT_STATIC -o panoview.exe -std=c++17 -static -L/c/msys64/mingw32/lib -static-libgcc -static-libstdc++ -lmingw32 -lSDL2main -lSDL2 -lpng -lz -lfreeglut_static -lglu32 -lopengl32 -lm -lwinpthread -lgdiplus -lshlwapi -lcomctl32 -lole32 -loleaut32 -ldinput8 -ldxguid -ldxerr8 -luser32 -lgdi32 -lwinmm -limm32 -lsetupapi -lversion -luuid -mwindows -Wl,--subsystem,windows -fPIC -m32
+  rm -f "crossprocess32.h" "crossprocess64.h"
 fi
