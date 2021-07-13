@@ -45,8 +45,13 @@
 #if defined(_WIN32)
 #include "Win32/libpng-util.h"
 #elif !defined(_WIN32)
-#if (defined(__APPLE__) && defined(__MACH__))
+#if defined(__APPLE__) && defined(__MACH__)
 #include "MacOSX/setpolicy.h"
+#else
+#include <X11/X.h>
+#include <X11/Xlib.h>
+#include <X11/extensions/Xrandr.h>
+#include <X11/extensions/Xinerama.h>
 #endif
 #include "Unix/lodepng.h"
 #endif
@@ -74,7 +79,6 @@
 #include <GL/glx.h>
 #endif
 #include <GL/glut.h>
-#include <SDL2/SDL.h>
 #endif
 
 #if defined(_WIN32)
@@ -94,6 +98,18 @@ using std::size_t;
 typedef string wid_t;
 
 namespace {
+
+#if defined(X_PROTOCOL)
+Display *display = nullptr;
+int displayX            = -1;
+int displayY            = -1;
+int displayWidth        = -1;
+int displayHeight       = -1;
+int displayXGetter      = -1;
+int displayYGetter      = -1;
+int displayWidthGetter  = -1;
+int displayHeightGetter = -1;
+#endif
 
 string cwd;
 wid_t windowId  = "-1"; 
@@ -233,10 +249,6 @@ void DrawCursor(GLuint texid, int curx, int cury, int curwidth, int curheight) {
   glEnd(); glDisable(GL_TEXTURE_2D);
 }
 
-#if !(defined(__APPLE__) && defined(__MACH__))
-SDL_Window *hidden = nullptr;
-#endif
-
 vector<string> StringSplitByFirstEqualsSign(string str) {
   size_t pos = 0;
   vector<string> vec;
@@ -356,7 +368,72 @@ void UpdateEnvironmentVariables() {
   }
 }
 
-void display() {
+#if defined(X_PROTOCOL)
+void DisplayGetPosition(bool i, int *result) {
+  *result = 0; Rotation original_rotation; 
+  Window root = XDefaultRootWindow(display);
+  XRRScreenConfiguration *conf = XRRGetScreenInfo(display, root);
+  SizeID original_size_id = XRRConfigCurrentConfiguration(conf, &original_rotation);
+  if (XineramaIsActive(display)) {
+    int m = 0; XineramaScreenInfo *xrrp = XineramaQueryScreens(display, &m);
+    if (!i) *result = xrrp[original_size_id].x_org;
+    else if (i) *result = xrrp[original_size_id].y_org;
+    XFree(xrrp);
+  }
+}
+
+void DisplayGetSize(bool i, int *result) {
+  *result = 0; int num_sizes; Rotation original_rotation; 
+  Window root = XDefaultRootWindow(display);
+  int screen = XDefaultScreen(display);
+  XRRScreenConfiguration *conf = XRRGetScreenInfo(display, root);
+  SizeID original_size_id = XRRConfigCurrentConfiguration(conf, &original_rotation);
+  if (XineramaIsActive(display)) {
+    XRRScreenSize *xrrs = XRRSizes(display, screen, &num_sizes);
+    if (!i) *result = xrrs[original_size_id].width;
+    else if (i) *result = xrrs[original_size_id].height;
+  } else if (!i) *result = XDisplayWidth(display, screen);
+  else if (i) *result = XDisplayHeight(display, screen);
+}
+
+int DisplayGetX() {
+  if (displayXGetter == displayX && displayX != -1)
+    return displayXGetter;
+  DisplayGetPosition(false, &displayXGetter);
+  int result = displayXGetter;
+  displayX = result;
+  return result;
+}
+
+int DisplayGetY() { 
+  if (displayYGetter == displayY && displayY != -1)
+    return displayYGetter;
+  DisplayGetPosition(true, &displayYGetter);
+  int result = displayYGetter;
+  displayY = result;
+  return result;
+}
+
+int DisplayGetWidth() {
+  if (displayWidthGetter == displayWidth && displayWidth != -1) 
+    return displayWidthGetter;
+  DisplayGetSize(false, &displayWidthGetter);
+  int result = displayWidthGetter;
+  displayWidth = result;
+  return result;
+}
+
+int DisplayGetHeight() {
+  if (displayHeightGetter == displayHeight && displayHeight != -1)
+    return displayHeightGetter;
+  DisplayGetSize(true, &displayHeightGetter);
+  int result = displayHeightGetter;
+  displayHeight = result;
+  return result;
+}
+#endif
+
+void DisplayGraphics() {
   glClearColor(0, 0, 0, 1);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_PROJECTION);
@@ -373,33 +450,19 @@ void display() {
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, tex);
   DrawPanorama(); glFlush();
-
-  #if !(defined(__APPLE__) && defined(__MACH__))
-  SDL_Rect rect; if (hidden == nullptr) { return; }
-  int dpy = SDL_GetWindowDisplayIndex(hidden);
-  int err = SDL_GetDisplayBounds(dpy, &rect); 
-  if (err == 0) {
-    glClear(GL_DEPTH_BITS);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, rect.w, rect.h, 0, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, cur);
-    DrawCursor(cur, (rect.w / 2) - 16, (rect.h / 2) - 16, 32, 32);
-    glBlendFunc(GL_ONE, GL_ZERO);
-  }
-  #else
   glClear(GL_DEPTH_BITS);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
+  #if defined(_WIN32)
+  int w = GetSystemMetrics(SM_CXSCREEN);
+  int h = GetSystemMetrics(SM_CYSCREEN);
+  #elif defined(__APPLE__) && defined(__MACH__)
   int w = CGDisplayPixelsWide(kCGDirectMainDisplay);
   int h = CGDisplayPixelsHigh(kCGDirectMainDisplay);
+  #else
+  int w = DisplayGetX() + DisplayGetWidth();
+  int h = DisplayGetY() + DisplayGetHeight(); 
+  #endif
   glOrtho(0, w, h, 0, -1, 1);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
@@ -411,8 +474,6 @@ void display() {
   glBindTexture(GL_TEXTURE_2D, cur);
   DrawCursor(cur, (w / 2) - 16, (h / 2) - 16, 32, 32);
   glBlendFunc(GL_ONE, GL_ZERO);
-  #endif
-
   glutSwapBuffers();
 }
 
@@ -437,31 +498,56 @@ void PanoramaSetVertAngle(double vangle) {
   MaximumVerticalAngle);
 }
 
-void WarpMouse() {
-  #if !(defined(__APPLE__) && defined(__MACH__))
-  int mx, my; SDL_Rect rect;
-  SDL_GetGlobalMouseState(&mx, &my);
-  if (hidden == nullptr) { return; }
-  int dpy = SDL_GetWindowDisplayIndex(hidden);
-  int err = SDL_GetDisplayBounds(dpy, &rect);
-  if (err == 0) {
-    int dx = rect.x, hdw = rect.x + (rect.w / 2);
-    int dy = rect.y, hdh = rect.y + (rect.h / 2);
-    SDL_WarpMouseGlobal(hdw, hdh);
-    PanoramaSetHorzAngle((hdw - mx) / 20);
-    PanoramaSetVertAngle((hdh - my) / 20);
-  }
-  #else
-  CGEventRef event = CGEventCreate(nullptr);
-  CGPoint cursor = CGEventGetLocation(event);
-  CFRelease(event);
-  int hdw = CGDisplayPixelsWide(kCGDirectMainDisplay) / 2;
-  int hdh = CGDisplayPixelsHigh(kCGDirectMainDisplay) / 2;
-  CGDisplayMoveCursorToPoint(kCGDirectMainDisplay, CGPointMake(hdw, hdh));
+void WarpMouse(int x, int y) {
+  #ifdef _WIN32
+  SetCursorPos(x, y);
+  #elif defined(__APPLE__) && defined(__MACH__)
+  CGDisplayMoveCursorToPoint(kCGDirectMainDisplay, CGPointMake(x, y));
   CGAssociateMouseAndMouseCursorPosition(true);
-  PanoramaSetHorzAngle((hdw - cursor.x) / 20);
-  PanoramaSetVertAngle((hdh - cursor.y) / 20);
+  #else
+  Window root = XDefaultRootWindow(display);
+  XWarpPointer(display, None, root, 0, 0, 0, 0, x, y);
+  XFlush(display);
   #endif
+}
+
+void ScreenGetCenter(int *hdw, int *hdh) {
+  #if defined(_WIN32)
+  *hdw = GetSystemMetrics(SM_CXSCREEN) / 2;
+  *hdh = GetSystemMetrics(SM_CYSCREEN) / 2;
+  #elif defined(__APPLE__) && defined(__MACH__)
+  *hdw = CGDisplayPixelsWide(kCGDirectMainDisplay) / 2;
+  *hdh = CGDisplayPixelsHigh(kCGDirectMainDisplay) / 2;
+  #else
+  *hdw = DisplayGetX() + (DisplayGetWidth() / 2);
+  *hdh = DisplayGetY() + (DisplayGetHeight() / 2); 
+  #endif
+}
+
+void MouseGetPosition(int *mx, int *my) {
+  #if defined(_WIN32)
+  POINT mouse = { 0 }; GetCursorPos(&mouse);
+  *mx = (int)mouse.x; *my = (int)mouse.y;
+  #elif defined(__APPLE__) && defined(__MACH__)
+  CGEventRef event = CGEventCreate(nullptr);
+  CGPoint mouse = CGEventGetLocation(event);
+  *mx = mouse.x; *my = mouse.y;
+  CFRelease(event);
+  #else
+  unsigned m; int rx, ry; 
+  Window root = XDefaultRootWindow(display), r, c; 
+  XQueryPointer(display, root, &r, &c, &rx, &ry, 
+  mx, my, &m);
+  #endif
+}
+
+void UpdateMouseLook() {
+  int hdw, hdh, mx, my;
+  ScreenGetCenter(&hdw, &hdh); 
+  MouseGetPosition(&mx, &my); 
+  WarpMouse(hdw, hdh);
+  PanoramaSetHorzAngle((hdw - mx) / 20);
+  PanoramaSetVertAngle((hdh - my) / 20);
 }
 
 void GetTexelUnderCursor(int *TexX, int *TexY) {
@@ -473,7 +559,7 @@ void GetTexelUnderCursor(int *TexX, int *TexY) {
 void timer(int i) {
   AspectRatio = std::fmin(std::fmax(AspectRatio, 0.1), 6);
   MaximumVerticalAngle = (std::atan2((700 / AspectRatio) / 2, 100) * 180.0 / PI) - 30;
-  WarpMouse();
+  UpdateMouseLook();
   glutPostRedisplay();
   glutTimerFunc(5, timer, 0);
 }
@@ -484,6 +570,9 @@ void keyboard(unsigned char key, int x, int y) {
     case 27:
       glutDestroyWindow(window);
       std::cout << "Forced Quit..." << std::endl;
+      #if defined(X_PROTOCOL)
+      XCloseDisplay(display);
+      #endif
       exit(0);
       break;
   }
@@ -508,22 +597,17 @@ void mouse(int button, int state, int x, int y) {
 } // anonymous namespace
 
 int main(int argc, char **argv) {
+  #if defined(X_PROTOCOL)
+  display = XOpenDisplay(nullptr);
+  #endif
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE);
-
-  #if !(defined(__APPLE__) && defined(__MACH__))
-  SDL_Init(SDL_INIT_VIDEO);
-  hidden = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, 
-  SDL_WINDOWPOS_CENTERED, 0, 0, SDL_WINDOW_BORDERLESS);
-  if (hidden != nullptr) { SDL_HideWindow(hidden); }
-  #else
+  #if defined(__APPLE__) && defined(__MACH__)
   setpolicy();
   #endif
-
   glutInitWindowPosition(0, 0);
   glutInitWindowSize(1, 1);
   window = glutCreateWindow("");
-
   #if defined(_WIN32)
   HWND handle = WindowFromDC(wglGetCurrentDC());
   ShowWindow(handle, SW_HIDE);
@@ -540,20 +624,16 @@ int main(int argc, char **argv) {
   windowId = std::to_string((unsigned long)glXGetCurrentDrawable());
   std::cout << "Window ID: " << windowId << std::endl;
   #endif
-
-  glutDisplayFunc(display);
+  glutDisplayFunc(DisplayGraphics);
   glutHideWindow();
   glClearColor(0, 0, 0, 1);
-
   CrossProcess::PROCID pid; 
   string exefile; char *exe = nullptr;
   CrossProcess::ProcIdFromSelf(&pid);
   CrossProcess::ExeFromProcId(pid, &exe);
   exefile = exe;
-
   if (exefile.find_last_of("/\\") != string::npos)
   cwd = exefile.substr(0, exefile.find_last_of("/\\"));
-
   string panorama; if (argc == 1) {
   #if defined(_WIN32)
   dialog_module::widget_set_owner((char *)std::to_string(
@@ -561,7 +641,6 @@ int main(int argc, char **argv) {
   #else
   dialog_module::widget_set_owner((char *)"-1");
   #endif
-
   CrossProcess::DirectorySetCurrentWorking((cwd + "/examples").c_str());
   dialog_module::widget_set_icon((char *)(cwd + "/icon.png").c_str());
   panorama = dialog_module::get_open_filename_ext((char *)
@@ -569,41 +648,42 @@ int main(int argc, char **argv) {
   (char *)"burning_within.png", (char *)(cwd + "/examples").c_str(), 
   (char *)"Choose a 360 Degree Cylindrical Panoramic Image");
   if (strcmp(panorama.c_str(), "") == 0) { 
-  glutDestroyWindow(window); exit(0); } } else { panorama = argv[1]; }
+  glutDestroyWindow(window); 
+  #if defined(X_PROTOCOL)
+  XCloseDisplay(display);
+  #endif
+  exit(0); } } else { panorama = argv[1]; }
   string cursor = (argc > 2) ? argv[2] : cwd + "/cursor.png";
   CrossProcess::DirectorySetCurrentWorking(cwd.c_str());
-
   glClearDepth(1);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LEQUAL);
   glShadeModel(GL_SMOOTH);
   glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-
   LoadPanorama(panorama.c_str());
   LoadCursor(cursor.c_str());
   glutKeyboardFunc(keyboard);
   glutMouseFunc(mouse);
   glutTimerFunc(0, timer, 0);
-
   string str1 = CrossProcess::EnvironmentGetVariable("PANORAMA_XANGLE");
   string str2 = CrossProcess::EnvironmentGetVariable("PANORAMA_YANGLE");
   double initxangle = strtod((!str1.empty()) ? str1.c_str() : "0", nullptr); 
   double inityangle = strtod((!str2.empty()) ? str2.c_str() : "0", nullptr);
-  
   for (size_t i = 0; i < 150; i++) {
-    WarpMouse();
+    UpdateMouseLook();
     xangle = initxangle;
     yangle = inityangle;
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
-  
   glutShowWindow();
   glutFullScreen();
   #if defined(_WIN32)
   ShowWindow(handle, SW_SHOW);
   #endif
-
   DisplayCursor(false);
   glutMainLoop();
+  #if defined(X_PROTOCOL)
+  XCloseDisplay(display);
+  #endif
   return 0;
 }
