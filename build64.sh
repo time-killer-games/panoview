@@ -10,13 +10,5 @@ elif [ $(uname) = "FreeBSD" ]; then
 elif [ $(uname) = "DragonFly" ]; then
   g++ panoview.cpp Universal/crossprocess.cpp Unix/lodepng.cpp xlib/dlgmodule.cpp -o panoview -std=c++17 -I/usr/local/include -L/usr/local/lib -lGL -lGLU -lglut -lm -lpthread -lX11 -lXrandr -lXinerama -lkvm -lutil -lc -m64
 else
-  cd "Universal"
-  "/c/msys64/msys2_shell.cmd" -defterm -mingw32 -no-start -here -lc "g++ crossprocess.cpp -o crossprocess32.exe -std=c++17 -static-libgcc -static-libstdc++ -static -m32";
-  "/c/msys64/msys2_shell.cmd" -defterm -mingw64 -no-start -here -lc "g++ crossprocess.cpp -o crossprocess64.exe -std=c++17 -static-libgcc -static-libstdc++ -static -m64";
-  xxd -i 'crossprocess32' | sed 's/\([0-9a-f]\)$/\0, 0x00/' > 'crossprocess32.h'
-  xxd -i 'crossprocess64' | sed 's/\([0-9a-f]\)$/\0, 0x00/' > 'crossprocess64.h'
-  rm -f "crossprocess32.exe" "crossprocess64.exe"
-  cd ".."
-  g++ panoview.cpp Universal/crossprocess.cpp Win32/libpng-util.cpp Win32/dlgmodule.cpp -DXPROCESS_WIN32EXE_INCLUDES -DFREEGLUT_STATIC -o panoview.exe -std=c++17 -static -I/c/msys64/mingw64/inlcude -L/c/msys64/mingw64/lib -static-libgcc -static-libstdc++ -lmingw32 -lpng -lz -lfreeglut_static -lglu32 -lopengl32 -lgdiplus -lshlwapi -lcomctl32 -lcomdlg32 -lole32 -Wl,--subsystem,windows -fPIC -m64
-  rm -f "Universal/crossprocess32.h" "Universal/crossprocess64.h"
+  g++ panoview.cpp Universal/crossprocess.cpp Win32/libpng-util.cpp Win32/dlgmodule.cpp /c/msys64/mingw64/lib/libpng.a /c/msys64/mingw64/lib/libz.a /c/msys64/mingw64/lib/libfreeglut_static.a -DXPROCESS_WIN32EXE_INCLUDES -DFREEGLUT_STATIC -o panoview.exe -std=c++17 -static -I/c/msys64/mingw64/inlcude -L/c/msys64/mingw64/lib -static-libgcc -static-libstdc++ -lmingw32 -lglu32 -lopengl32 -lgdiplus -lgdi32 -lshlwapi -lcomctl32 -lcomdlg32 -lole32 -lwinmm -Wl,--subsystem,windows -fPIC -m64
 fi
