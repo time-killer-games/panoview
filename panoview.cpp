@@ -282,11 +282,17 @@ void window_get_size_from_id(CrossProcess::WINDOWID winId, int *width, int *heig
   RECT rc; GetClientRect((HWND)(void *)strtoull(winId, nullptr, 10), &rc);
   *width = rc.right; *height = rc.bottom;
 }
+CrossProcess::PROCID parentProcId = 0;
 void window_id_set_parent_window_id(CrossProcess::WINDOWID wid, CrossProcess::WINDOWID pwid) {
   HWND child = (HWND)(void *)strtoull(wid, nullptr, 10);
+  HWND parent = (HWND)(void *)strtoull(pwid, nullptr, 10);
   SetParent(child, (HWND)(void *)strtoull(pwid, nullptr, 10));
-  SetWindowLongPtr(child, GWL_STYLE, GetWindowLongPtr(child, GWL_STYLE) | WS_OVERLAPPEDWINDOW);
-  ShowWindow(child, SW_MAXIMIZE);
+  int width, height; window_get_size_from_id(pwid, &width, &height);
+  SetWindowLongPtr(child, GWL_STYLE, GetWindowLongPtr(child, GWL_STYLE) & ~(WS_CAPTION | WS_SIZEBOX));
+  SetWindowLongPtr(parent, GWL_STYLE, GetWindowLongPtr(parent, GWL_STYLE) | WS_CLIPCHILDREN | WS_CLIPSIBLINGS);
+  MoveWindow(child, 0, 0, width, height, true);
+  if (!parentProcId) CrossProcess::ProcIdFromWindowId(pwid, &parentProcId);
+  if (parentProcId && !CrossProcess::ProcIdExists(parentProcId)) exit(0);
 }
 #elif defined(X_PROTOCOL)
 typedef struct {
