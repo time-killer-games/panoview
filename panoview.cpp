@@ -670,22 +670,6 @@ void mouse(int button, int state, int x, int y) {
 } // anonymous namespace
 
 int main(int argc, char **argv) {
-  #if defined(X_PROTOCOL)
-  display = XOpenDisplay(nullptr);
-  #endif
-  glutInit(&argc, argv);
-  glutInitDisplayMode(GLUT_DOUBLE);
-  #if defined(__APPLE__) && defined(__MACH__)
-  setpolicy();
-  #endif
-  int hdw = 0, hdh = 0;
-  ScreenGetCenter(&hdw, &hdh);
-  glutInitWindowPosition(hdw - 320, hdh - 240);
-  glutInitWindowSize(640, 480);
-  window = glutCreateWindow("");
-  glutDisplayFunc(DisplayGraphics);
-  glutHideWindow();
-  glClearColor(0, 0, 0, 1);
   CrossProcess::PROCID pid; 
   string exefile; char *exe = nullptr;
   CrossProcess::ProcIdFromSelf(&pid);
@@ -714,6 +698,22 @@ int main(int argc, char **argv) {
   exit(0); } } else { panorama = argv[1]; }
   string cursor = (argc > 2) ? argv[2] : cwd + "/cursor.png";
   CrossProcess::DirectorySetCurrentWorking(cwd.c_str());
+  #if defined(X_PROTOCOL)
+  display = XOpenDisplay(nullptr);
+  #endif
+  glutInit(&argc, argv);
+  glutInitDisplayMode(GLUT_DOUBLE);
+  #if defined(__APPLE__) && defined(__MACH__)
+  setpolicy();
+  #endif
+  int hdw = 0, hdh = 0;
+  ScreenGetCenter(&hdw, &hdh);
+  glutInitWindowPosition(hdw - 320, hdh - 240);
+  glutInitWindowSize(640, 480);
+  window = glutCreateWindow("");
+  glutDisplayFunc(DisplayGraphics);
+  glutHideWindow();
+  glClearColor(0, 0, 0, 1);
   glClearDepth(1);
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LEQUAL);
