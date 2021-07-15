@@ -277,11 +277,15 @@ string StringReplaceAll(string str, string substr, string nstr) {
   return str;
 }
 
-#if defined(_WIN32) 
-window_id_set_parent_window_id(WINDOW window) {
+#if defined(_WIN32)
+void window_get_size_from_id(CrossProcess::WINDOWID winId, int *width, int *height) {
+  RECT rc; GetClientRect((HWND)(void *)strtoull(winId, nullptr, 10), &rc);
+  *width = rc.right; *height = rc.bottom;
+}
+void window_id_set_parent_window_id(CrossProcess::WINDOWID wid, CrossProcess::WINDOWID pwid) {
   HWND child = (HWND)(void *)strtoull(wid, nullptr, 10);
   SetParent(child, (HWND)(void *)strtoull(pwid, nullptr, 10));
-  SetWindowLongPtr(child, GWL_STYLE, (GetWindowLongPtr(child, GWL_STYLE) | WS_OVERLAPPEDWINDOW);
+  SetWindowLongPtr(child, GWL_STYLE, GetWindowLongPtr(child, GWL_STYLE) | WS_OVERLAPPEDWINDOW);
   ShowWindow(child, SW_MAXIMIZE);
 }
 #elif defined(X_PROTOCOL)
@@ -292,7 +296,13 @@ typedef struct {
   long inputMode;
   unsigned long status;
 } Hints;
-window_id_set_parent_window_id(WINDOW window) {
+void window_get_size_from_id(CrossProcess::WINDOWID winId, int *width, int *height) {
+  Window window = strtoull(winId, nullptr, 10);
+  Window r = 0; int x = 0, y = 0; unsigned w = 0, h = 0, b = 0, d = 0; 
+  XGetGeometry(display, (Drawable)window, &r, &x, &y, &w, &h, &b, &d);
+  *width = w; *height = h;
+}
+void window_id_set_parent_window_id(CrossProcess::WINDOWID wid, CrossProcess::WINDOWID pwid) {
   Hints hints;
   Atom property = XInternAtom(d, "_MOTIF_WM_HINTS", False);
   hints.flags = 2; hints.decorations = show;
@@ -300,9 +310,20 @@ window_id_set_parent_window_id(WINDOW window) {
   Window parent = strtoull(pwid, nullptr, 10);
   XChangeProperty(display, child, property, property, 32, PropModeReplace, (unsigned char *)&hints, 5);
   XReparentWindow(display, child, parent, 0, 0);
-  Window r = 0; int x = 0, y = 0; unsigned w = 0, h = 0, b = 0, d = 0; 
-  XGetGeometry(display, (Drawable)parent, &r, &x, &y, &w, &h, &b, &d);
-  XResizeWindow(display, win, w, h);
+  window_get_size_from_id(winId, &width, &height);
+  XResizeWindow(display, win, width, height);
+}
+#endif
+#if defined(_WIN32) || defined(X_PROTOCOL)
+int window_get_width_from_id(CrossProcess::WINDOWID winId) {
+  int width, height;
+  window_get_size_from_id(winId, &width, &height);
+  return width;
+}
+int window_get_height_from_id(CrossProcess::WINDOWID winId) {
+  int width, height;
+  window_get_size_from_id(winId, &width, &height);
+  return height;
 }
 #endif
 
@@ -482,8 +503,8 @@ void DisplayGraphics() {
   glClear(GL_DEPTH_BITS);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  int ww = window_get_width_from_id((char *)windowId.c_str());
-  int wh = window_get_height_from_id((char *)windowId.c_str());
+  int ww = window_get_width_from_id((CrossProcess::WINDOWID)windowId.c_str());
+  int wh = window_get_height_from_id((CrossProcess::WINDOWID)windowId.c_str());
   glOrtho(0, ww, wh, 0, -1, 1);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
@@ -715,7 +736,7 @@ int main(int argc, char **argv) {
   }
   glutShowWindow();
   #if defined(_WIN32)
-  ShowWindow(handle, SW_SHOW);
+  ShowWindow((HWND)(void *)strtoull(windowId.c_str(), nullptr, 10), SW_SHOW);
   #endif
   DisplayCursor(false);
   glutMainLoop();
