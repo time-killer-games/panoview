@@ -46,7 +46,7 @@
 #include "Win32/libpng-util.h"
 #elif !defined(_WIN32)
 #if defined(__APPLE__) && defined(__MACH__)
-#include "MacOSX/setpolicy.h"
+#include "MacOSX/objcpp.h"
 #else
 #include <X11/X.h>
 #include <X11/Xlib.h>
@@ -277,6 +277,35 @@ string StringReplaceAll(string str, string substr, string nstr) {
   return str;
 }
 
+#if defined(_WIN32) 
+window_id_set_parent_window_id(WINDOW window) {
+  HWND child = (HWND)(void *)strtoull(wid, nullptr, 10);
+  SetParent(child, (HWND)(void *)strtoull(pwid, nullptr, 10));
+  SetWindowLongPtr(child, GWL_STYLE, (GetWindowLongPtr(child, GWL_STYLE) | WS_OVERLAPPEDWINDOW);
+  ShowWindow(child, SW_MAXIMIZE);
+}
+#elif defined(X_PROTOCOL)
+typedef struct {
+  unsigned long flags;
+  unsigned long functions;
+  unsigned long decorations;
+  long inputMode;
+  unsigned long status;
+} Hints;
+window_id_set_parent_window_id(WINDOW window) {
+  Hints hints;
+  Atom property = XInternAtom(d, "_MOTIF_WM_HINTS", False);
+  hints.flags = 2; hints.decorations = show;
+  Window child = strtoull(wid, nullptr, 10);
+  Window parent = strtoull(pwid, nullptr, 10);
+  XChangeProperty(display, child, property, property, 32, PropModeReplace, (unsigned char *)&hints, 5);
+  XReparentWindow(display, child, parent, 0, 0);
+  Window r = 0; int x = 0, y = 0; unsigned w = 0, h = 0, b = 0, d = 0; 
+  XGetGeometry(display, (Drawable)parent, &r, &x, &y, &w, &h, &b, &d);
+  XResizeWindow(display, win, w, h);
+}
+#endif
+
 void EnvironFromStdInput(string name, string *value) {
   #if defined(_WIN32)
   DWORD bytesAvail = 0;
@@ -453,17 +482,9 @@ void DisplayGraphics() {
   glClear(GL_DEPTH_BITS);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  #if defined(_WIN32)
-  int w = GetSystemMetrics(SM_CXSCREEN);
-  int h = GetSystemMetrics(SM_CYSCREEN);
-  #elif defined(__APPLE__) && defined(__MACH__)
-  int w = CGDisplayPixelsWide(kCGDirectMainDisplay);
-  int h = CGDisplayPixelsHigh(kCGDirectMainDisplay);
-  #else
-  int w = DisplayGetX() + DisplayGetWidth();
-  int h = DisplayGetY() + DisplayGetHeight(); 
-  #endif
-  glOrtho(0, w, h, 0, -1, 1);
+  int ww = window_get_width_from_id((char *)windowId.c_str());
+  int wh = window_get_height_from_id((char *)windowId.c_str());
+  glOrtho(0, ww, wh, 0, -1, 1);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
   glDisable(GL_CULL_FACE);
@@ -472,7 +493,7 @@ void DisplayGraphics() {
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, cur);
-  DrawCursor(cur, (w / 2) - 16, (h / 2) - 16, 32, 32);
+  DrawCursor(cur, (ww / 2) - 16, (wh / 2) - 16, 32, 32);
   glBlendFunc(GL_ONE, GL_ZERO);
   glutSwapBuffers();
 }
@@ -557,6 +578,37 @@ void GetTexelUnderCursor(int *TexX, int *TexY) {
 }
 
 void timer(int i) {
+  string str = CrossProcess::EnvironmentGetVariable("PARENT_WINDOWID");
+  if (str.empty()) str = "0";
+  if (windowId == "-1") {
+    #if defined(_WIN32)
+    HWND handle = WindowFromDC(wglGetCurrentDC());
+    ShowWindow(handle, SW_HIDE);
+    windowId = std::to_string((unsigned long long)(void *)handle);
+    std::cout << "Window ID: " << windowId << std::endl;
+    #elif (defined(__APPLE__) && defined(__MACH__))
+    CrossProcess::WINDOWID *wid; int widsize;
+    CrossProcess::WindowIdFromProcId(getpid(), &wid, &widsize);
+    if (str.empty()) str = "0";
+    if (wid) { 
+      if (widsize) { 
+        for (int i = 0; i < widsize; i++) { 
+          const char *title = window_id_set_parent_window_id(wid[i], (char *)str.c_str());
+          if (title != nullptr && strcmp(title, "") == 0) {
+            windowId = wid[i];
+          } 
+        }
+      }
+      CrossProcess::FreeWindowId(wid);
+    } 
+    std::cout << "Window ID: " << windowId << std::endl; 
+    #elif (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__)
+    windowId = std::to_string((unsigned long)glXGetCurrentDrawable());
+    std::cout << "Window ID: " << windowId << std::endl;
+    #endif
+  }
+  if (CrossProcess::WindowIdExists((char *)str.c_str()) && str != "0")
+  window_id_set_parent_window_id((char *)windowId.c_str(), (char *)str.c_str());
   AspectRatio = std::fmin(std::fmax(AspectRatio, 0.1), 6);
   MaximumVerticalAngle = (std::atan2((700 / AspectRatio) / 2, 100) * 180.0 / PI) - 30;
   UpdateMouseLook();
@@ -605,25 +657,11 @@ int main(int argc, char **argv) {
   #if defined(__APPLE__) && defined(__MACH__)
   setpolicy();
   #endif
-  glutInitWindowPosition(0, 0);
-  glutInitWindowSize(1, 1);
+  int hdw = 0, hdh = 0;
+  ScreenGetCenter(&hdw, &hdh);
+  glutInitWindowPosition(hdw - 320, hdh - 240);
+  glutInitWindowSize(640, 480);
   window = glutCreateWindow("");
-  #if defined(_WIN32)
-  HWND handle = WindowFromDC(wglGetCurrentDC());
-  ShowWindow(handle, SW_HIDE);
-  const void *address = static_cast<const void *>(handle);
-  std::stringstream ss; ss << address; windowId = ss.str();
-  std::cout << "Window ID: " << windowId << std::endl;
-  #elif (defined(__APPLE__) && defined(__MACH__))
-  CrossProcess::WINDOWID *wid; int widsize;
-  CrossProcess::WindowIdFromProcId(getpid(), &wid, &widsize);
-  if (wid) { if (widsize) { windowId = wid[0];
-  std::cout << "Window ID: " << windowId << std::endl; } 
-  CrossProcess::FreeWindowId(wid); }
-  #elif (defined(__linux__) && !defined(__ANDROID__)) || defined(__FreeBSD__)
-  windowId = std::to_string((unsigned long)glXGetCurrentDrawable());
-  std::cout << "Window ID: " << windowId << std::endl;
-  #endif
   glutDisplayFunc(DisplayGraphics);
   glutHideWindow();
   glClearColor(0, 0, 0, 1);
@@ -676,7 +714,6 @@ int main(int argc, char **argv) {
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
   glutShowWindow();
-  glutFullScreen();
   #if defined(_WIN32)
   ShowWindow(handle, SW_SHOW);
   #endif
