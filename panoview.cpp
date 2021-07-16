@@ -310,14 +310,14 @@ void window_get_size_from_id(CrossProcess::WINDOWID winId, int *width, int *heig
 }
 void window_id_set_parent_window_id(CrossProcess::WINDOWID wid, CrossProcess::WINDOWID pwid) {
   Hints hints;
-  Atom property = XInternAtom(d, "_MOTIF_WM_HINTS", False);
-  hints.flags = 2; hints.decorations = show;
+  Atom property = XInternAtom(display, "_MOTIF_WM_HINTS", false);
+  hints.flags = 2; hints.decorations = 0;
   Window child = strtoull(wid, nullptr, 10);
   Window parent = strtoull(pwid, nullptr, 10);
   XChangeProperty(display, child, property, property, 32, PropModeReplace, (unsigned char *)&hints, 5);
   XReparentWindow(display, child, parent, 0, 0);
-  window_get_size_from_id(winId, &width, &height);
-  XResizeWindow(display, win, width, height);
+  int width = 0, height = 0; window_get_size_from_id(wid, &width, &height);
+  XResizeWindow(display, strtoull(wid, nullptr, 10), width, height);
 }
 #endif
 #if defined(_WIN32) || defined(X_PROTOCOL)
