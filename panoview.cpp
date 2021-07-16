@@ -605,7 +605,7 @@ void GetTexelUnderCursor(int *TexX, int *TexY) {
 }
 
 void timer(int i) {
-  string str = CrossProcess::EnvironmentGetVariable("PARENT_WINDOWID");
+  string str = CrossProcess::EnvironmentGetVariable("WINDOWID");
   if (str.empty()) str = "0";
   if (windowId == "-1") {
     #if defined(_WIN32)
@@ -614,9 +614,8 @@ void timer(int i) {
     windowId = std::to_string((unsigned long long)(void *)handle);
     std::cout << "Window ID: " << windowId << std::endl;
     #elif (defined(__APPLE__) && defined(__MACH__))
-    CrossProcess::WINDOWID *wid; int widsize;
+    CrossProcess::WINDOWID *wid = nullptr; int widsize = 0;
     CrossProcess::WindowIdFromProcId(getpid(), &wid, &widsize);
-    if (str.empty()) str = "0";
     if (wid) { 
       if (widsize) { 
         for (int i = 0; i < widsize; i++) { 
@@ -676,6 +675,18 @@ void mouse(int button, int state, int x, int y) {
 } // anonymous namespace
 
 int main(int argc, char **argv) {
+  #if defined(__APPLE__) && defined(__MACH__)
+  glutInit(&argc, argv);
+  glutInitDisplayMode(GLUT_DOUBLE);
+  int hdw = 0, hdh = 0;
+  ScreenGetCenter(&hdw, &hdh);
+  glutInitWindowSize(640, 480);
+  glutInitWindowPosition(hdw - 320, hdh - 240);
+  window = glutCreateWindow("");
+  glutDisplayFunc(DisplayGraphics);
+  glutHideWindow();
+  setpolicy();
+  #endif
   CrossProcess::PROCID pid; 
   string exefile; char *exe = nullptr;
   CrossProcess::ProcIdFromSelf(&pid);
@@ -707,18 +718,17 @@ int main(int argc, char **argv) {
   #if defined(X_PROTOCOL)
   display = XOpenDisplay(nullptr);
   #endif
+  #if !defined(__APPLE__) && !defined(__MACH__)
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE);
-  #if defined(__APPLE__) && defined(__MACH__)
-  setpolicy();
-  #endif
   int hdw = 0, hdh = 0;
   ScreenGetCenter(&hdw, &hdh);
-  glutInitWindowPosition(hdw - 320, hdh - 240);
   glutInitWindowSize(640, 480);
+  glutInitWindowPosition(hdw - 320, hdh - 240);
   window = glutCreateWindow("");
   glutDisplayFunc(DisplayGraphics);
   glutHideWindow();
+  #endif
   glClearColor(0, 0, 0, 1);
   glClearDepth(1);
   glEnable(GL_DEPTH_TEST);

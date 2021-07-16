@@ -27,6 +27,7 @@
 #include <string>
 
 #include "objcpp.h"
+#include "../Universal/crossprocess.h"
 
 bool cocoa_pid_from_wid(CGWindowID wid, pid_t *pid, bool onscreenonly) {
   bool result = false; CGWindowListOption options = kCGWindowListOptionIncludingWindow | 
@@ -81,8 +82,27 @@ void window_get_rect_from_id(char *window, int *x, int *y, int *width, int *heig
 }
 
 void setpolicy() {
-  [[NSApplication sharedApplication] setActivationPolicy:(NSApplicationActivationPolicy)1];
-  [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
+  if (CrossProcess::WindowIdExists((CrossProcess::WINDOWID)
+    CrossProcess::EnvironmentGetVariable("WINDOWID"))) {
+    [[NSApplication sharedApplication] setActivationPolicy:(NSApplicationActivationPolicy)1];
+    [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
+  }
+  CrossProcess::WINDOWID *wid = nullptr; int widsize = 0;
+  CrossProcess::WindowIdFromProcId(getpid(), &wid, &widsize);
+  if (wid) { 
+    if (widsize) { 
+      for (int i = 0; i < widsize; i++) { 
+        const char *title = window_id_set_parent_window_id(wid[i], (char *)"0");
+        if (title != nullptr && strcmp(title, "") == 0) {
+          int hdw = CGDisplayPixelsWide(kCGDirectMainDisplay) / 2;
+          int hdh = CGDisplayPixelsHigh(kCGDirectMainDisplay) / 2;
+          [[NSApp windowWithWindowNumber:strtoull(wid[i], nullptr, 10)] 
+          setFrame:NSMakeRect(hdw - 320, hdh - 240, 640, 480) display:YES];
+        } 
+      }
+    }
+    CrossProcess::FreeWindowId(wid);
+  } 
 }
 
 char *window_id_from_native_window(char *native) {
